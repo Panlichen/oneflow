@@ -435,6 +435,11 @@ message CollectiveBoxingGenericOpConf {
   required boxing.collective.RankDesc rank_desc = 2;
 }
 
+message OfCollectiveBoxingReduceOpConf {
+  required LogicalBlobId lbi = 1;
+  required boxing.collective.RankDesc rank_desc = 2;
+}
+
 message BoxingIdentityOpConf {
   required LogicalBlobId lbi = 1;
 }
