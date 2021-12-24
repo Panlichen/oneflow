@@ -527,6 +527,7 @@ message OperatorConf {
     CollectiveBoxingPackOpConf collective_boxing_pack_conf = 174;
     CollectiveBoxingUnpackOpConf collective_boxing_unpack_conf = 175;
     BoxingZerosOpConf boxing_zeros_conf = 176;
+    OfCollectiveBoxingReduceOpConf of_collective_boxing_reduce_conf = 177;
     UserOpConf user_conf = 199;
 
     // domain op
