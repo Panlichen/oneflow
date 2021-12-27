@@ -41,4 +41,5 @@ REGISTER_ACTOR(TaskType::kCollectiveBoxingReduce, NaiveActor);
 REGISTER_ACTOR(TaskType::kCopyHd, NaiveActor);
 #endif
 REGISTER_ACTOR(TaskType::kCollectiveBoxingGeneric, NaiveActor);
+REGISTER_ACTOR(TaskType::kOfCollectiveBoxingReduce, NaiveActor);
 }  // namespace oneflow

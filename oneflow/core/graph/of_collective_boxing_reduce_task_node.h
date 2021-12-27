@@ -34,7 +34,7 @@ class OfCollectiveBoxingReduceTaskNode : public TransportTaskNode {
   void ProduceAllRegstsAndBindEdges() override;
   void ConsumeAllRegsts() final;
   void InferProducedDataRegstTimeShape() final;
-  TaskType GetTaskType() const override { return TaskType::kCollectiveBoxingReduce; }
+  TaskType GetTaskType() const override { return TaskType::kOfCollectiveBoxingReduce; }
 
   OperatorConf op_conf_;
 };

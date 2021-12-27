@@ -41,16 +41,16 @@ void OfCollectiveBoxingReduceTaskNode::ConsumeAllRegsts() {
 
 void OfCollectiveBoxingReduceTaskNode::BuildExecGphAndRegst() {
   ExecNode* node = mut_exec_gph().NewNode();
-  std::shared_ptr<Operator> boxing_op = CHECK_JUST(ConstructOp(op_conf_));
-  node->mut_op() = boxing_op;
-  for (const std::string& ibn : boxing_op->input_bns()) {
+  std::shared_ptr<Operator> reduce_boxing_op = CHECK_JUST(ConstructOp(op_conf_));
+  node->mut_op() = reduce_boxing_op;
+  for (const std::string& ibn : reduce_boxing_op->input_bns()) {
     node->BindBnWithRegst(ibn, GetSoleConsumedRegst("in"));
   }
   std::shared_ptr<RegstDesc> out_regst = GetProducedRegst("out");
-  for (const std::string& obn : boxing_op->output_bns()) {
+  for (const std::string& obn : reduce_boxing_op->output_bns()) {
     CHECK(out_regst != nullptr);
     node->BindBnWithRegst(obn, out_regst);
-    out_regst->AddLbi(boxing_op->BnInOp2Lbi(obn));
+    out_regst->AddLbi(reduce_boxing_op->BnInOp2Lbi(obn));
   }
   node->InferBlobDescs(nullptr);
 }

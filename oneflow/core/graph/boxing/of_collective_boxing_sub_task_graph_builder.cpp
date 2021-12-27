@@ -33,7 +33,7 @@ using namespace boxing::collective;
 
 namespace {
 
-void OcclInitCollectiveNode(OfCollectiveBoxingReduceTaskNode* node,
+void OfcclInitCollectiveNode(OfCollectiveBoxingReduceTaskNode* node,
                             const ParallelDesc& parallel_desc, int64_t parallel_id,
                             const std::string& name, const LogicalBlobId& lbi,
                             const BlobDesc& logical_blob_desc, OpType op_type, int64_t root) {
@@ -109,18 +109,23 @@ class OfCollectiveBoxingReduceSubTskGphBuilder final : public SubTskGphBuilder {
       if (root_parallel_id == -1) { return Error::BoxingNotSupportedError(); }
 
       const std::string op_name = "System-Boxing-OfCollectiveBoxingReduce-" + NewUniqueId();
+      std::vector<OfCollectiveBoxingReduceTaskNode*> reduce_nodes;
+      FOR_RANGE(int64_t, i, 0, in_parallel_desc.parallel_num()) {
+        auto* reduce_node = ctx->task_graph()->NewNode<OfCollectiveBoxingReduceTaskNode>();
+        OfcclInitCollectiveNode(reduce_node, in_parallel_desc, i, op_name, lbi,
+                               logical_blob_desc, OpType::kOpTypeReduce, root_parallel_id);
+        reduce_nodes.emplace_back(reduce_node);
+      }
+      // do we still need the control tasks?
       sorted_ctrl_tasks->resize(out_parallel_desc.parallel_num());
       FOR_RANGE(int64_t, i, 0, in_parallel_desc.parallel_num()) {
-        int real_rank = (i - root_parallel_id + in_parallel_desc.parallel_num()) % in_parallel_desc.parallel_num();
         TaskNode* in_node = sorted_in_tasks.at(i);
-        auto* collective_node = ctx->task_graph()->NewNode<OfCollectiveBoxingReduceTaskNode>();
-        OcclInitCollectiveNode(collective_node, in_parallel_desc, i, op_name, lbi,
-                               logical_blob_desc, OpType::kOpTypeReduce, root_parallel_id);
-        ctx->task_graph()->ConnectWithLbi(in_node, collective_node, lbi);
-        if (i == root_parallel_id) {
-          sorted_out_tasks->emplace_back(collective_node);
-        } else {
-          sorted_ctrl_tasks->at(0).emplace_back(collective_node);
+        ctx->task_graph()->ConnectWithLbi(in_node, reduce_nodes.at(i), lbi);
+        if(i == root_parallel_id){//end node, no sibling nodes
+          sorted_out_tasks->emplace_back(reduce_nodes.at(i));
+        }else {//other nodes, out edge to sibling
+          int64_t next_node_index = (i + 1) % in_parallel_desc.parallel_num();
+          ctx->task_graph()->ConnectWithLbi(reduce_nodes.at(i), reduce_nodes.at(next_node_index), lbi);
         }
       }
       return TRY(BuildSubTskGphBuilderStatus("OfCollectiveBoxingReduceSubTskGphBuilder", ""));

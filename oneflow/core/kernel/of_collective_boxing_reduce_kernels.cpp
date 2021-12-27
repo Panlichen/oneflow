@@ -40,6 +40,6 @@ void OfCollectiveBoxingReduceKernel::ForwardHeader(KernelContext* ctx) const {
 
 }
 
-REGISTER_KERNEL(OperatorConf::kOfCollectiveBoxingReduceOpConf, OfCollectiveBoxingReduceKernel);
+REGISTER_KERNEL(OperatorConf::kOfCollectiveBoxingReduceConf, OfCollectiveBoxingReduceKernel);
 
 }  // namespace oneflow
