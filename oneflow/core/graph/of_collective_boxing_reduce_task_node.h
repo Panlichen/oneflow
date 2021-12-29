@@ -13,8 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#ifndef ONEFLOW_CORE_GRAPH_COLLECTIVE_BOXING_TASK_NODE_H_
-#define ONEFLOW_CORE_GRAPH_COLLECTIVE_BOXING_TASK_NODE_H_
+#ifndef ONEFLOW_CORE_GRAPH_OF_COLLECTIVE_BOXING_REDUCE_TASK_NODE_H_
+#define ONEFLOW_CORE_GRAPH_OF_COLLECTIVE_BOXING_REDUCE_TASK_NODE_H_
 
 #include "oneflow/core/graph/transport_task_node.h"
 

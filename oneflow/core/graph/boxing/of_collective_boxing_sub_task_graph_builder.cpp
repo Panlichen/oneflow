@@ -116,8 +116,6 @@ class OfCollectiveBoxingReduceSubTskGphBuilder final : public SubTskGphBuilder {
                                logical_blob_desc, OpType::kOpTypeReduce, root_parallel_id);
         reduce_nodes.emplace_back(reduce_node);
       }
-      // do we still need the control tasks?
-      sorted_ctrl_tasks->resize(out_parallel_desc.parallel_num());
       FOR_RANGE(int64_t, i, 0, in_parallel_desc.parallel_num()) {
         TaskNode* in_node = sorted_in_tasks.at(i);
         ctx->task_graph()->ConnectWithLbi(in_node, reduce_nodes.at(i), lbi);
@@ -125,7 +123,9 @@ class OfCollectiveBoxingReduceSubTskGphBuilder final : public SubTskGphBuilder {
           sorted_out_tasks->emplace_back(reduce_nodes.at(i));
         }else {//other nodes, out edge to sibling
           int64_t next_node_index = (i + 1) % in_parallel_desc.parallel_num();
-          ctx->task_graph()->ConnectWithLbi(reduce_nodes.at(i), reduce_nodes.at(next_node_index), lbi);
+          TaskNode* proxy_node = ctx->task_graph()->GetProxyNode(
+            reduce_nodes.at(i), lbi, dynamic_cast<TaskNode*>(reduce_nodes.at(next_node_index))->MemZoneId121());
+          ctx->task_graph()->ConnectWithLbi(proxy_node, reduce_nodes.at(next_node_index), lbi);
         }
       }
       return TRY(BuildSubTskGphBuilderStatus("OfCollectiveBoxingReduceSubTskGphBuilder", ""));

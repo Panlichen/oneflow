@@ -30,8 +30,14 @@ class OfCollectiveBoxingReduceOp : public Operator {
   Maybe<void> InitFromOpConf() override {
     CHECK(op_conf().has_of_collective_boxing_reduce_conf());
     const RankDesc& rank_desc = op_conf().of_collective_boxing_reduce_conf().rank_desc();
-    if (GenericOpHasInput(rank_desc)) { EnrollInputBn("in", false); }
-    if (GenericOpHasOutput(rank_desc)) { EnrollOutputBn("out", false); }
+    // shall we use repeat?
+    if((rank_desc.op_desc().root()) + 1 % rank_desc.op_desc().num_ranks()==rank_desc.rank()){
+      EnrollRepeatedInputBn("in", 1, false);
+    }else{
+      EnrollRepeatedInputBn("in", 2, false);
+    }
+    
+    EnrollOutputBn("out", false);
     return Maybe<void>::Ok();
   }
 
@@ -53,17 +59,16 @@ class OfCollectiveBoxingReduceOp : public Operator {
       const ParallelContext* parallel_ctx) const override {
     const RankDesc& rank_desc = op_conf().of_collective_boxing_reduce_conf().rank_desc();
     const DataType data_type = rank_desc.op_desc().data_type();
-    if (GenericOpHasInput(rank_desc)) {
-      const BlobDesc* in = GetBlobDesc4BnInOp("in");
-      CHECK_OR_RETURN(!in->is_dynamic());
-      CHECK_EQ_OR_RETURN(in->data_type(), data_type);
-      CHECK_EQ_OR_RETURN(in->shape(), GenericOpGetInputShape(rank_desc));
+    FOR_RANGE(int64_t, i, 1, input_bns().size()) {
+      const BlobDesc* in_i = GetBlobDesc4BnInOp(GenRepeatedBn("in", i));
+      // does repeated blob have dynamic?
+      CHECK_OR_RETURN(!in_i->is_dynamic());
+      CHECK_EQ_OR_RETURN(in_i->data_type(), data_type);
+      CHECK_EQ_OR_RETURN(in_i->shape(), Shape(rank_desc.op_desc().shape()));
     }
-    if (GenericOpHasOutput(rank_desc)) {
-      BlobDesc* out = GetBlobDesc4BnInOp("out");
-      out->set_data_type(data_type);
-      out->mut_shape() = GenericOpGetOutputShape(rank_desc);
-    }
+    BlobDesc* out = GetBlobDesc4BnInOp("out");
+    out->set_data_type(data_type);
+    out->mut_shape() = Shape(rank_desc.op_desc().shape());
     return Maybe<void>::Ok();
   }
 };

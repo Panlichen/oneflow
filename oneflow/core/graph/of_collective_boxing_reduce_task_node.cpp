@@ -27,31 +27,36 @@ void OfCollectiveBoxingReduceTaskNode::Init(int64_t machine_id, int64_t thrd_id,
 }
 
 void OfCollectiveBoxingReduceTaskNode::ProduceAllRegstsAndBindEdges() {
-  if (boxing::collective::GenericOpHasOutput(
-          op_conf_.collective_boxing_generic_conf().rank_desc())) {
+  // if (boxing::collective::GenericOpHasOutput( maybe this is different, all nodes have a out register
+          // op_conf_.collective_boxing_generic_conf().rank_desc())) {
     std::shared_ptr<RegstDesc> out_regst = ProduceRegst("out", false, 1, 1);
-    this->ForEachOutDataEdge([&](TaskEdge* out_dege) { out_dege->AddRegst("out", out_regst); });
-  }
+    this->ForEachOutDataEdge([&](TaskEdge* out_dege) { out_dege->AddRegst("out", out_regst); }); //怎么知道有几条edge
+  // }
 }
 
 void OfCollectiveBoxingReduceTaskNode::ConsumeAllRegsts() {
-  this->ForEachInDataEdge(
-      [&](TaskEdge* in_edge) { ConsumeRegst("in", SoleInDataEdge()->GetSoleRegst()); });
+  int64_t in_data_edge_cnt = 0;
+  ForEachInDataEdge([&](TaskEdge* edge) {
+    const auto order_it = edge2order_.find(edge);
+    CHECK(order_it != edge2order_.end());
+    ConsumeRegst("in_" + std::to_string(order_it->second), edge->GetSoleRegst());
+    in_data_edge_cnt += 1;
+  });
 }
 
 void OfCollectiveBoxingReduceTaskNode::BuildExecGphAndRegst() {
   ExecNode* node = mut_exec_gph().NewNode();
   std::shared_ptr<Operator> reduce_boxing_op = CHECK_JUST(ConstructOp(op_conf_));
   node->mut_op() = reduce_boxing_op;
-  for (const std::string& ibn : reduce_boxing_op->input_bns()) {
-    node->BindBnWithRegst(ibn, GetSoleConsumedRegst("in"));
+  FOR_RANGE(size_t, i, 0, reduce_boxing_op->input_bns().size()) {
+    const std::string& ibn = reduce_boxing_op->input_bns().Get(i);
+    node->BindBnWithRegst(ibn, GetSoleConsumedRegst("in_" + std::to_string(i)));
   }
   std::shared_ptr<RegstDesc> out_regst = GetProducedRegst("out");
-  for (const std::string& obn : reduce_boxing_op->output_bns()) {
-    CHECK(out_regst != nullptr);
-    node->BindBnWithRegst(obn, out_regst);
-    out_regst->AddLbi(reduce_boxing_op->BnInOp2Lbi(obn));
-  }
+  out_regst->AddLbi(lbi());
+  node->BindBnWithRegst(reduce_boxing_op->SoleObn(), out_regst);
+  // what is this?
+  node->AddBnToRegstAndBindIt(&Operator::tmp_bns, GetProducedRegst("tmp"));
   node->InferBlobDescs(nullptr);
 }
 

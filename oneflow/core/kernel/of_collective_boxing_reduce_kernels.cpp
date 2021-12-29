@@ -17,6 +17,9 @@ limitations under the License.
 #include "oneflow/core/common/buffer_manager.h"
 #include "oneflow/core/job/critical_section_instance.h"
 #include "oneflow/core/common/multi_client.h"
+#include "oneflow/core/ep/include/primitive/add.h"
+#include "oneflow/core/ep/include/primitive/copy_nd.h"
+#include "oneflow/core/operator/operator.h"
 #include "oneflow/core/job/global_for.h"
 
 namespace oneflow {
@@ -29,15 +32,24 @@ class OfCollectiveBoxingReduceKernel final : public Kernel {
 
  private:
   void ForwardDataContent(KernelContext* ctx) const override;
-  void ForwardHeader(KernelContext* ctx) const override;
 };
 
 void OfCollectiveBoxingReduceKernel::ForwardDataContent(KernelContext* ctx) const {
-  
-}
-
-void OfCollectiveBoxingReduceKernel::ForwardHeader(KernelContext* ctx) const {
-
+  Blob* out = ctx->BnInOp2Blob("out");
+  std::unique_ptr<ep::primitive::Add> primitive =
+      ep::primitive::NewPrimitive<ep::primitive::AddFactory>(ctx->stream()->device_type(),
+                                                             out->data_type());
+  CHECK(primitive);
+  if (this->op_attribute().input_bns().size() == 1){ //start node
+    const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", 0));
+    AutoMemcpy(ctx->stream(), out, in_i);
+  } else {
+    FOR_RANGE(int64_t, i, 0, this->op_attribute().input_bns().size()) {
+      const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", i));
+      primitive->Launch(ctx->stream(), out->dptr(), in_i->dptr(), out->mut_dptr(),
+                          out->shape().elem_cnt());
+    }
+  }
 }
 
 REGISTER_KERNEL(OperatorConf::kOfCollectiveBoxingReduceConf, OfCollectiveBoxingReduceKernel);
