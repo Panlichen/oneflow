@@ -41,6 +41,16 @@ class OfCollectiveBoxingReduceOp : public Operator {
     return Maybe<void>::Ok();
   }
 
+  Symbol<OperatorConf> GetOpConfWithoutOpNameAndLbn() const {
+    OperatorConf op_conf(this->op_conf());
+    op_conf.set_name("undefined-op-name");
+    CHECK(op_conf.has_of_collective_boxing_reduce_conf());
+    auto* boxing_conf = op_conf.mutable_of_collective_boxing_reduce_conf();
+    LogicalBlobId empty_logical_blob_id{};
+    *boxing_conf->mutable_lbi() = empty_logical_blob_id;
+    return SymbolOf(op_conf);
+}
+
   LogicalBlobId lbi4ibn(const std::string& input_bn) const override {
     return this->op_conf().of_collective_boxing_reduce_conf().lbi();
   }

@@ -37,9 +37,7 @@ void OfCollectiveBoxingReduceTaskNode::ProduceAllRegstsAndBindEdges() {
 void OfCollectiveBoxingReduceTaskNode::ConsumeAllRegsts() {
   int64_t in_data_edge_cnt = 0;
   ForEachInDataEdge([&](TaskEdge* edge) {
-    const auto order_it = edge2order_.find(edge);
-    CHECK(order_it != edge2order_.end());
-    ConsumeRegst("in_" + std::to_string(order_it->second), edge->GetSoleRegst());
+    ConsumeRegst("in_" + std::to_string(in_data_edge_cnt), edge->GetSoleRegst());
     in_data_edge_cnt += 1;
   });
 }
@@ -56,7 +54,7 @@ void OfCollectiveBoxingReduceTaskNode::BuildExecGphAndRegst() {
   out_regst->AddLbi(lbi());
   node->BindBnWithRegst(reduce_boxing_op->SoleObn(), out_regst);
   // what is this?
-  node->AddBnToRegstAndBindIt(&Operator::tmp_bns, GetProducedRegst("tmp"));
+  // node->AddBnToRegstAndBindIt(&Operator::tmp_bns, GetProducedRegst("tmp"));
   node->InferBlobDescs(nullptr);
 }
 
