@@ -440,6 +440,11 @@ message OfCollectiveBoxingReduceOpConf {
   required boxing.collective.RankDesc rank_desc = 2;
 }
 
+message OfCollectiveBoxingBroadcastOpConf {
+  required LogicalBlobId lbi = 1;
+  required boxing.collective.RankDesc rank_desc = 2;
+}
+
 message BoxingIdentityOpConf {
   required LogicalBlobId lbi = 1;
 }
@@ -528,6 +533,7 @@ message OperatorConf {
     CollectiveBoxingUnpackOpConf collective_boxing_unpack_conf = 175;
     BoxingZerosOpConf boxing_zeros_conf = 176;
     OfCollectiveBoxingReduceOpConf of_collective_boxing_reduce_conf = 177;
+    OfCollectiveBoxingBroadcastOpConf of_collective_boxing_broadcast_conf = 178;
     UserOpConf user_conf = 199;
 
     // domain op

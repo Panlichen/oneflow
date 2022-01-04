@@ -27,11 +27,8 @@ void OfCollectiveBoxingReduceTaskNode::Init(int64_t machine_id, int64_t thrd_id,
 }
 
 void OfCollectiveBoxingReduceTaskNode::ProduceAllRegstsAndBindEdges() {
-  // if (boxing::collective::GenericOpHasOutput( maybe this is different, all nodes have a out register
-          // op_conf_.collective_boxing_generic_conf().rank_desc())) {
-    std::shared_ptr<RegstDesc> out_regst = ProduceRegst("out", false, 1, 1);
-    this->ForEachOutDataEdge([&](TaskEdge* out_dege) { out_dege->AddRegst("out", out_regst); }); //怎么知道有几条edge
-  // }
+  std::shared_ptr<RegstDesc> out_regst = ProduceRegst("out", false, 1, 1);
+  this->ForEachOutDataEdge([&](TaskEdge* out_dege) { out_dege->AddRegst("out", out_regst); });
 }
 
 void OfCollectiveBoxingReduceTaskNode::ConsumeAllRegsts() {
@@ -53,8 +50,6 @@ void OfCollectiveBoxingReduceTaskNode::BuildExecGphAndRegst() {
   std::shared_ptr<RegstDesc> out_regst = GetProducedRegst("out");
   out_regst->AddLbi(lbi());
   node->BindBnWithRegst(reduce_boxing_op->SoleObn(), out_regst);
-  // what is this?
-  // node->AddBnToRegstAndBindIt(&Operator::tmp_bns, GetProducedRegst("tmp"));
   node->InferBlobDescs(nullptr);
 }
 

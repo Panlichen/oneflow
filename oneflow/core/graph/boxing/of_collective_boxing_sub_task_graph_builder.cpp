@@ -135,6 +135,70 @@ class OfCollectiveBoxingReduceSubTskGphBuilder final : public SubTskGphBuilder {
   }
 };
 
+class OfCollectiveBoxingBroadcastSubTskGphBuilder final : public SubTskGphBuilder {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(OfCollectiveBoxingBroadcastSubTskGphBuilder);
+  OfCollectiveBoxingBroadcastSubTskGphBuilder() = default;
+  ~OfCollectiveBoxingBroadcastSubTskGphBuilder() override = default;
+
+  Maybe<SubTskGphBuilderStatus> Build(
+      SubTskGphBuilderCtx* ctx, const std::vector<TaskNode*>& sorted_in_tasks,
+      std::vector<TaskNode*>* sorted_out_tasks,
+      std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
+      const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
+      const BlobDesc& logical_blob_desc, const cfg::SbpParallel& in_sbp_parallel,
+      const cfg::SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
+    if (in_parallel_desc.parallel_num() == 1 && out_parallel_desc.parallel_num() > 1
+        && (in_parallel_desc.device_type() == DeviceType::kCUDA
+            || (in_parallel_desc.device_type() == DeviceType::kCPU
+                && logical_blob_desc.shape().elem_cnt() >= 1024))
+        && out_parallel_desc.device_type() == DeviceType::kCUDA
+        && !SubTskGphBuilderUtil::BlobHasDynamicShape(logical_blob_desc)
+        && out_sbp_parallel.has_broadcast_parallel()) {
+      TaskNode* gpu_in_node = nullptr;
+      int64_t root_parallel_id = -1;
+      if (in_parallel_desc.device_type() == DeviceType::kCPU) {
+        auto* cpu_in_node = sorted_in_tasks.front();
+        root_parallel_id =
+            SubTskGphBuilderUtil::FindNearestSrcParallelId(out_parallel_desc, in_parallel_desc, 0);
+        gpu_in_node =
+            ctx->task_graph()->GetProxyNode(cpu_in_node, lbi, out_parallel_desc, root_parallel_id);
+
+      } else if (in_parallel_desc.device_type() == DeviceType::kCUDA) {
+        root_parallel_id = FindRootParallelId(out_parallel_desc, in_parallel_desc);
+        gpu_in_node = sorted_in_tasks.front();
+      } else {
+        return Error::BoxingNotSupportedError();
+      }
+      if (root_parallel_id == -1) { return Error::BoxingNotSupportedError(); }
+
+      const std::string op_name = "System-Boxing-OfCollectiveBoxingBroadcast-" + NewUniqueId();
+      std::vector<OfCollectiveBoxingBroadcastTaskNode*> broadcast_nodes;
+      FOR_RANGE(int64_t, i, 0, out_parallel_desc.parallel_num()) {
+        auto* broadcast_node = ctx->task_graph()->NewNode<OfCollectiveBoxingBroadcastTaskNode>();
+        OfcclInitCollectiveNode(broadcast_node, out_parallel_desc, i, op_name, lbi,
+                               logical_blob_desc, OpType::kOpTypeBroadcast, root_parallel_id);
+        broadcast_nodes.emplace_back(broadcast_node);
+      }
+      FOR_RANGE(int64_t, i, 0, out_parallel_desc.parallel_num()) {
+        int64_t next_node_index = (i + 1) % out_parallel_desc.parallel_num();
+        if (next_node_index != root_parallel_id) {// if the next node is root, it should not pass the data to the next node.
+          if(i == root_parallel_id){
+            ctx->task_graph()->ConnectWithLbi(gpu_in_node, broadcast_nodes.at(i), lbi);
+          }
+          TaskNode* proxy_node = ctx->task_graph()->GetProxyNode(
+            broadcast_nodes.at(i), lbi, dynamic_cast<TaskNode*>(broadcast_nodes.at(next_node_index))->MemZoneId121());
+          ctx->task_graph()->ConnectWithLbi(proxy_node, broadcast_nodes.at(next_node_index), lbi);
+        }
+        sorted_out_tasks->emplace_back(broadcast_nodes.at(i));
+      }
+      return TRY(BuildSubTskGphBuilderStatus("OfCollectiveBoxingBroadcastSubTskGphBuilder", ""));
+    } else {
+      return Error::BoxingNotSupportedError();
+    }
+  }
+};
+
 }  // namespace
 
 OfCollectiveBoxingSubTskGphBuilder::OfCollectiveBoxingSubTskGphBuilder() {
