@@ -18,6 +18,7 @@ limitations under the License.
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 #include "oneflow/core/graph/collective_boxing_task_node.h"
 #include "oneflow/core/graph/of_collective_boxing_reduce_task_node.h"
+#include "oneflow/core/graph/of_collective_boxing_broadcast_task_node.h"
 #include "oneflow/core/graph/slice_boxing_task_node.h"
 #include "oneflow/core/graph/collective_boxing_pack_task_node.h"
 #include "oneflow/core/graph/collective_boxing_unpack_task_node.h"
@@ -41,6 +42,44 @@ void OfcclInitCollectiveNode(OfCollectiveBoxingReduceTaskNode* node,
   op_conf.set_name(name);
   op_conf.set_device_tag(*CHECK_JUST(DeviceTag4DeviceType(DeviceType::kCUDA)));
   OfCollectiveBoxingReduceOpConf* conf = op_conf.mutable_of_collective_boxing_reduce_conf();
+  *conf->mutable_lbi() = lbi;
+  RankDesc* rank_desc = conf->mutable_rank_desc();
+  OpDesc* op_desc = rank_desc->mutable_op_desc();
+  op_desc->set_name(name);
+  op_desc->set_op_type(op_type);
+  if (op_type == OpType::kOpTypeAllReduce || op_type == OpType::kOpTypeReduceScatter
+      || op_type == OpType::kOpTypeReduce) {
+    op_desc->set_reduce_method(ReduceMethod::kReduceMethodSum);
+  }
+  op_desc->set_data_type(logical_blob_desc.data_type());
+  logical_blob_desc.shape().ToProto(op_desc->mutable_shape());
+  op_desc->set_num_ranks(parallel_desc.parallel_num());
+  if (op_type == OpType::kOpTypeBroadcast || op_type == OpType::kOpTypeReduce) {
+    CHECK_GE(root, 0);
+    CHECK_LT(root, parallel_desc.parallel_num());
+    op_desc->set_root(root);
+  } else {
+    CHECK_EQ(root, -1);
+  }
+  op_desc->set_backend(Backend::kBackendOf);
+  rank_desc->set_rank(parallel_id);
+
+  const int64_t machine_id = CHECK_JUST(parallel_desc.MachineId4ParallelId(parallel_id));
+  const int64_t device_index = CHECK_JUST(parallel_desc.DeviceId4ParallelId(parallel_id));
+  const int64_t thrd_id = EncodeStreamIdToInt64(
+      GenerateNamedTaskStreamId(machine_id, DeviceType::kCUDA, device_index, "OfCCL"));
+  node->Init(machine_id, thrd_id, lbi, op_conf);
+}
+
+void OfcclInitCollectiveNode_Broadcast(OfCollectiveBoxingBroadcastTaskNode* node,
+                            const ParallelDesc& parallel_desc, int64_t parallel_id,
+                            const std::string& name, const LogicalBlobId& lbi,
+                            const BlobDesc& logical_blob_desc, OpType op_type, int64_t root) {
+                                OperatorConf op_conf;
+  // 这么写是肯定不行的，需要重构，重构的工作重点在于，1）把第一个参数变成一个通用性的；2）下面需要获取一个OpConf，这个OpConf也需要变成通用性的，但目前我们都没有。
+  op_conf.set_name(name);
+  op_conf.set_device_tag(*CHECK_JUST(DeviceTag4DeviceType(DeviceType::kCUDA)));
+  OfCollectiveBoxingBroadcastOpConf* conf = op_conf.mutable_of_collective_boxing_broadcast_conf();
   *conf->mutable_lbi() = lbi;
   RankDesc* rank_desc = conf->mutable_rank_desc();
   OpDesc* op_desc = rank_desc->mutable_op_desc();
@@ -176,7 +215,7 @@ class OfCollectiveBoxingBroadcastSubTskGphBuilder final : public SubTskGphBuilde
       std::vector<OfCollectiveBoxingBroadcastTaskNode*> broadcast_nodes;
       FOR_RANGE(int64_t, i, 0, out_parallel_desc.parallel_num()) {
         auto* broadcast_node = ctx->task_graph()->NewNode<OfCollectiveBoxingBroadcastTaskNode>();
-        OfcclInitCollectiveNode(broadcast_node, out_parallel_desc, i, op_name, lbi,
+        OfcclInitCollectiveNode_Broadcast(broadcast_node, out_parallel_desc, i, op_name, lbi,
                                logical_blob_desc, OpType::kOpTypeBroadcast, root_parallel_id);
         broadcast_nodes.emplace_back(broadcast_node);
       }
@@ -206,6 +245,7 @@ OfCollectiveBoxingSubTskGphBuilder::OfCollectiveBoxingSubTskGphBuilder() {
       Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf();
   std::vector<std::shared_ptr<SubTskGphBuilder>> builders;
   builders.emplace_back(new OfCollectiveBoxingReduceSubTskGphBuilder());
+  builders.emplace_back(new OfCollectiveBoxingBroadcastSubTskGphBuilder());
 //   if (collective_boxing_conf.nccl_enable_all_to_all()) {
 // #if defined(WITH_CUDA) && NCCL_VERSION_CODE > 2700
 //     builders.emplace_back(new NcclCollectiveBoxingAll2AllSubTskGphBuilder());

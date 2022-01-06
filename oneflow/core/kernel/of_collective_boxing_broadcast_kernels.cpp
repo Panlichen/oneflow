@@ -35,21 +35,18 @@ class OfCollectiveBoxingBroadcastKernel final : public Kernel {
 };
 
 void OfCollectiveBoxingBroadcastKernel::ForwardDataContent(KernelContext* ctx) const {
+  Blob* in = ctx->BnInOp2Blob("in");
   Blob* out = ctx->BnInOp2Blob("out");
-  std::unique_ptr<ep::primitive::Add> primitive =
-      ep::primitive::NewPrimitive<ep::primitive::AddFactory>(ctx->stream()->device_type(),
-                                                             out->data_type());
-  CHECK(primitive);
-  if (this->op_attribute().input_bns().size() == 1){ //start node
-    const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", 0));
-    AutoMemcpy(ctx->stream(), out, in_i);
-  } else {
-    FOR_RANGE(int64_t, i, 0, this->op_attribute().input_bns().size()) {
-      const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", i));
-      primitive->Launch(ctx->stream(), out->dptr(), in_i->dptr(), out->mut_dptr(),
-                          out->shape().elem_cnt());
-    }
-  }
+  AutoMemcpy(ctx->stream(), out, in);
+  // if (this->op_attribute().output_bns().size() == 1){
+  //   Blob* out = ctx->BnInOp2Blob(GenRepeatedBn("out", 0));
+  //   AutoMemcpy(ctx->stream(), out, in);
+  // } else {
+  //   FOR_RANGE(int64_t, i, 0, this->op_attribute().output_bns().size()) {
+  //     Blob* out_i = ctx->BnInOp2Blob(GenRepeatedBn("in", i));
+  //     AutoMemcpy(ctx->stream(), out_i, in);
+  //   }
+  // }
 }
 
 REGISTER_KERNEL(OperatorConf::kOfCollectiveBoxingBroadcastConf, OfCollectiveBoxingBroadcastKernel);

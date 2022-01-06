@@ -27,11 +27,8 @@ void OfCollectiveBoxingBroadcastTaskNode::Init(int64_t machine_id, int64_t thrd_
 }
 
 void OfCollectiveBoxingBroadcastTaskNode::ProduceAllRegstsAndBindEdges() {
-  int64_t out_data_edge_cnt = 0;
-  ForEachOutDataEdge([&](TaskEdge* edge) {
-    edge->AddRegst("out_" + std::to_string(out_data_edge_cnt), ProduceRegst("out_" + std::to_string(out_data_edge_cnt), false, 1, 1));
-    out_data_edge_cnt += 1;
-  });
+  std::shared_ptr<RegstDesc> out_regst_desc = ProduceRegst("out", true);
+  this->ForEachOutDataEdge([&](TaskEdge* edge) { edge->AddRegst("out", out_regst_desc); });
 }
 
 void OfCollectiveBoxingBroadcastTaskNode::ConsumeAllRegsts() {
@@ -44,13 +41,11 @@ void OfCollectiveBoxingBroadcastTaskNode::BuildExecGphAndRegst() {
   ExecNode* node = mut_exec_gph().NewNode();
   std::shared_ptr<Operator> broadcast_boxing_op = CHECK_JUST(ConstructOp(op_conf_));
   node->mut_op() = broadcast_boxing_op;
-  std::shared_ptr<RegstDesc> in_regst = GetConsumedRegst("in");
-  in_regst->AddLbi(lbi());
-  node->BindBnsWithRegst(broadcast_boxing_op->SoleObn(), in_regst);
-  FOR_RANGE(size_t, i, 0, broadcast_boxing_op->output_bns().size()) {
-    const std::string& obn = broadcast_boxing_op->output_bns().Get(i);
-    node->BindBnWithRegst(obn, GetProducedRegst("out_" + std::to_string(i)));
-  }
+  const std::string& ibn = broadcast_boxing_op->input_bns().Get(0);
+  node->BindBnWithRegst(ibn, GetSoleConsumedRegst("in"));
+  std::shared_ptr<RegstDesc> out_regst = GetProducedRegst("out");
+  out_regst->AddLbi(lbi());
+  node->BindBnWithRegst(broadcast_boxing_op->SoleObn(), out_regst);
   node->InferBlobDescs(nullptr);
 }
 

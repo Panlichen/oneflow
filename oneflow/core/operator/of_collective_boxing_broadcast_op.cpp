@@ -29,14 +29,8 @@ class OfCollectiveBoxingBroadcastOp : public Operator {
  private:
   Maybe<void> InitFromOpConf() override {
     CHECK(op_conf().has_of_collective_boxing_broadcast_conf());
-    const RankDesc& rank_desc = op_conf().of_collective_boxing_broadcast_conf().rank_desc();
-    if((rank_desc.rank() + 1) % rank_desc.op_desc().num_ranks()==rank_desc.op_desc().root()){
-      EnrollRepeatedOutputBn("out", 1, false);
-    }else{
-      EnrollRepeatedOutputBn("out", 2, false);
-    }
-    
     EnrollInputBn("in", false);
+    EnrollOutputBn("out");
     return Maybe<void>::Ok();
   }
 
@@ -74,11 +68,14 @@ class OfCollectiveBoxingBroadcastOp : public Operator {
     CHECK_EQ_OR_RETURN(in->data_type(), data_type);
     CHECK_EQ_OR_RETURN(in->shape(), Shape(rank_desc.op_desc().shape()));
 
-    FOR_RANGE(int64_t, i, 1, output_bns().size()) {  
-      BlobDesc* out_i = GetBlobDesc4BnInOp(GenRepeatedBn("out", i));
-      out_i->set_data_type(data_type);
-      out_i->mut_shape() = Shape(rank_desc.op_desc().shape());
-    }
+    BlobDesc* out = GetBlobDesc4BnInOp("out");
+    out->set_data_type(data_type);
+    out->mut_shape() = Shape(rank_desc.op_desc().shape());
+    // FOR_RANGE(int64_t, i, 1, output_bns().size()) {  
+    //   BlobDesc* out_i = GetBlobDesc4BnInOp(GenRepeatedBn("out", i));
+    //   out_i->set_data_type(data_type);
+    //   out_i->mut_shape() = Shape(rank_desc.op_desc().shape());
+    // }
     return Maybe<void>::Ok();
   }
 };
