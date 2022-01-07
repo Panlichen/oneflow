@@ -238,6 +238,75 @@ class OfCollectiveBoxingBroadcastSubTskGphBuilder final : public SubTskGphBuilde
   }
 };
 
+class OfCollectiveBoxingAllReduceSubTskGphBuilder final : public SubTskGphBuilder {
+ public:
+  OF_DISALLOW_COPY_AND_MOVE(OfCollectiveBoxingAllReduceSubTskGphBuilder);
+  OfCollectiveBoxingAllReduceSubTskGphBuilder() = default;
+  ~OfCollectiveBoxingAllReduceSubTskGphBuilder() override = default;
+
+  Maybe<SubTskGphBuilderStatus> Build(
+      SubTskGphBuilderCtx* ctx, const std::vector<TaskNode*>& sorted_in_tasks,
+      std::vector<TaskNode*>* sorted_out_tasks,
+      std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
+      const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
+      const BlobDesc& logical_blob_desc, const cfg::SbpParallel& in_sbp_parallel,
+      const cfg::SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
+    if (out_parallel_desc.Equals(in_parallel_desc)
+        && !SubTskGphBuilderUtil::BlobHasDynamicShape(logical_blob_desc)
+        && out_parallel_desc.device_type() == DeviceType::kCUDA
+        && out_parallel_desc.parallel_num() > 1
+        && SubTskGphBuilderUtil::IsBoxingP2B(in_sbp_parallel, out_sbp_parallel)) {
+      const std::string op_name = "System-Boxing-OfCollectiveBoxingAllReduce-" + NewUniqueId();
+            std::vector<OfCollectiveBoxingReduceTaskNode*> reduce_nodes;
+      // the root id of the reduce part and broadcast part is the same.
+      // the end of the reduce node has the full data and then broadcasts data
+      const int64_t root_parallel_id = in_parallel_desc.parallel_num() - 1;
+      // reduce part
+      FOR_RANGE(int64_t, i, 0, in_parallel_desc.parallel_num()) {
+        auto* reduce_node = ctx->task_graph()->NewNode<OfCollectiveBoxingReduceTaskNode>();
+        OfcclInitCollectiveNode(reduce_node, in_parallel_desc, i, op_name, lbi,
+                               logical_blob_desc, OpType::kOpTypeReduce, root_parallel_id);
+        reduce_nodes.emplace_back(reduce_node);
+      }
+      FOR_RANGE(int64_t, i, 0, in_parallel_desc.parallel_num()) {
+        TaskNode* in_node = sorted_in_tasks.at(i);
+        ctx->task_graph()->ConnectWithLbi(in_node, reduce_nodes.at(i), lbi);
+        if(i != root_parallel_id){
+          int64_t next_node_index = (i + 1) % in_parallel_desc.parallel_num();
+          TaskNode* proxy_node = ctx->task_graph()->GetProxyNode(
+            reduce_nodes.at(i), lbi, dynamic_cast<TaskNode*>(reduce_nodes.at(next_node_index))->MemZoneId121());
+          ctx->task_graph()->ConnectWithLbi(proxy_node, reduce_nodes.at(next_node_index), lbi);
+        }
+      }
+      // reduce done
+      // broadcast
+      TaskNode* gpu_in_node = reduce_nodes.at(root_parallel_id);
+            std::vector<OfCollectiveBoxingBroadcastTaskNode*> broadcast_nodes;
+      FOR_RANGE(int64_t, i, 0, out_parallel_desc.parallel_num()) {
+        auto* broadcast_node = ctx->task_graph()->NewNode<OfCollectiveBoxingBroadcastTaskNode>();
+        OfcclInitCollectiveNode_Broadcast(broadcast_node, out_parallel_desc, i, op_name, lbi,
+                               logical_blob_desc, OpType::kOpTypeBroadcast, root_parallel_id);
+        broadcast_nodes.emplace_back(broadcast_node);
+      }
+      FOR_RANGE(int64_t, i, 0, out_parallel_desc.parallel_num()) {
+        int64_t next_node_index = (i + 1) % out_parallel_desc.parallel_num();
+        if (next_node_index != root_parallel_id) {// if the next node is root, it should not pass the data to the next node.
+          if(i == root_parallel_id){
+            ctx->task_graph()->ConnectWithLbi(gpu_in_node, broadcast_nodes.at(i), lbi);
+          }
+          TaskNode* proxy_node = ctx->task_graph()->GetProxyNode(
+            broadcast_nodes.at(i), lbi, dynamic_cast<TaskNode*>(broadcast_nodes.at(next_node_index))->MemZoneId121());
+          ctx->task_graph()->ConnectWithLbi(proxy_node, broadcast_nodes.at(next_node_index), lbi);
+        }
+        sorted_out_tasks->emplace_back(broadcast_nodes.at(i));
+      }
+      return TRY(BuildSubTskGphBuilderStatus("OfCollectiveBoxingAllReduceSubTskGphBuilder", ""));
+    } else {
+      return Error::BoxingNotSupportedError();
+    }
+  }
+};
+
 }  // namespace
 
 OfCollectiveBoxingSubTskGphBuilder::OfCollectiveBoxingSubTskGphBuilder() {
