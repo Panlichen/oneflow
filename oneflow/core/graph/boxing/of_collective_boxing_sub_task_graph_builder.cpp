@@ -313,6 +313,7 @@ OfCollectiveBoxingSubTskGphBuilder::OfCollectiveBoxingSubTskGphBuilder() {
   const CollectiveBoxingConf collective_boxing_conf =
       Global<ResourceDesc, ForSession>::Get()->collective_boxing_conf();
   std::vector<std::shared_ptr<SubTskGphBuilder>> builders;
+  builders.emplace_back(new OfCollectiveBoxingAllReduceSubTskGphBuilder());
   builders.emplace_back(new OfCollectiveBoxingReduceSubTskGphBuilder());
   builders.emplace_back(new OfCollectiveBoxingBroadcastSubTskGphBuilder());
 //   if (collective_boxing_conf.nccl_enable_all_to_all()) {
