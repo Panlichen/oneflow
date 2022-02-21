@@ -137,8 +137,8 @@ class OfCollectiveBoxingReduceSubTskGphBuilder final : public SubTskGphBuilder {
       std::vector<TaskNode*>* sorted_out_tasks,
       std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
       const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
-      const BlobDesc& logical_blob_desc, const cfg::SbpParallel& in_sbp_parallel,
-      const cfg::SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
+      const BlobDesc& logical_blob_desc, const SbpParallel& in_sbp_parallel,
+      const SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
     if (in_parallel_desc.parallel_num() > 1 && out_parallel_desc.parallel_num() == 1
         && in_parallel_desc.device_type() == DeviceType::kCUDA
         && out_parallel_desc.device_type() == DeviceType::kCUDA
@@ -185,8 +185,8 @@ class OfCollectiveBoxingBroadcastSubTskGphBuilder final : public SubTskGphBuilde
       std::vector<TaskNode*>* sorted_out_tasks,
       std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
       const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
-      const BlobDesc& logical_blob_desc, const cfg::SbpParallel& in_sbp_parallel,
-      const cfg::SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
+      const BlobDesc& logical_blob_desc, const SbpParallel& in_sbp_parallel,
+      const SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
     if (in_parallel_desc.parallel_num() == 1 && out_parallel_desc.parallel_num() > 1
         && (in_parallel_desc.device_type() == DeviceType::kCUDA
             || (in_parallel_desc.device_type() == DeviceType::kCPU
@@ -249,8 +249,8 @@ class OfCollectiveBoxingAllReduceSubTskGphBuilder final : public SubTskGphBuilde
       std::vector<TaskNode*>* sorted_out_tasks,
       std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
       const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
-      const BlobDesc& logical_blob_desc, const cfg::SbpParallel& in_sbp_parallel,
-      const cfg::SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
+      const BlobDesc& logical_blob_desc, const SbpParallel& in_sbp_parallel,
+      const SbpParallel& out_sbp_parallel, const Shape& time_shape) const override {
     if (out_parallel_desc.Equals(in_parallel_desc)
         && !SubTskGphBuilderUtil::BlobHasDynamicShape(logical_blob_desc)
         && out_parallel_desc.device_type() == DeviceType::kCUDA
@@ -331,8 +331,8 @@ Maybe<SubTskGphBuilderStatus> OfCollectiveBoxingSubTskGphBuilder::Build(
     std::vector<TaskNode*>* sorted_out_tasks,
     std::vector<std::vector<TaskNode*>>* sorted_ctrl_tasks, const ParallelDesc& in_parallel_desc,
     const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
-    const BlobDesc& logical_blob_desc, const cfg::SbpParallel& in_sbp_parallel,
-    const cfg::SbpParallel& out_sbp_parallel, const Shape& time_shape) const {
+    const BlobDesc& logical_blob_desc, const SbpParallel& in_sbp_parallel,
+    const SbpParallel& out_sbp_parallel, const Shape& time_shape) const {
   if (!GlobalJobDesc().Bool("__is_user_function__")) { return Error::BoxingNotSupportedError(); }
   if (!IsSourceTimeShape(time_shape)) { return Error::BoxingNotSupportedError(); }
   return chain_builder_->Build(ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
