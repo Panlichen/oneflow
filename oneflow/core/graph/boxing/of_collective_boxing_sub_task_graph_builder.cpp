@@ -24,6 +24,7 @@ limitations under the License.
 #include "oneflow/core/graph/collective_boxing_unpack_task_node.h"
 #include "oneflow/core/graph/task_stream_id.h"
 #include "oneflow/core/job/nd_sbp_util.h"
+#include <iostream>
 #ifdef WITH_CUDA
 #include <nccl.h>
 #endif
@@ -160,7 +161,8 @@ class OfCollectiveBoxingReduceSubTskGphBuilder final : public SubTskGphBuilder {
         ctx->task_graph()->ConnectWithLbi(in_node, reduce_nodes.at(i), lbi);
         if(i == root_parallel_id){//end node, no sibling nodes
           sorted_out_tasks->emplace_back(reduce_nodes.at(i));
-        }else {//other nodes, out edge to sibling
+          std::cout << "sorted_out_tasks has length " << sorted_out_tasks->size() << std::endl;
+        }else {//other nodes, out edge to sibling 
           int64_t next_node_index = (i + 1) % in_parallel_desc.parallel_num();
           TaskNode* proxy_node = ctx->task_graph()->GetProxyNode(
             reduce_nodes.at(i), lbi, dynamic_cast<TaskNode*>(reduce_nodes.at(next_node_index))->MemZoneId121());

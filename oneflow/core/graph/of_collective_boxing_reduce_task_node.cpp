@@ -28,7 +28,7 @@ void OfCollectiveBoxingReduceTaskNode::Init(int64_t machine_id, int64_t thrd_id,
 
 void OfCollectiveBoxingReduceTaskNode::ProduceAllRegstsAndBindEdges() {
   std::shared_ptr<RegstDesc> out_regst = ProduceRegst("out", false, 1, 1);
-  this->ForEachOutDataEdge([&](TaskEdge* out_dege) { out_dege->AddRegst("out", out_regst); });
+  this->ForEachOutDataEdge([&](TaskEdge* out_edge) { out_edge->AddRegst("out", out_regst); });
 }
 
 void OfCollectiveBoxingReduceTaskNode::ConsumeAllRegsts() {
