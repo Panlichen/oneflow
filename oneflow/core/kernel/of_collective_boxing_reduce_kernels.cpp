@@ -40,22 +40,31 @@ void OfCollectiveBoxingReduceKernel::ForwardDataContent(KernelContext* ctx) cons
       ep::primitive::NewPrimitive<ep::primitive::AddFactory>(ctx->stream()->device_type(),
                                                              out->data_type());
   CHECK(primitive);
-#if defined(WITH_CUDA)
-  cudaMemset(out->mut_dptr(), 0,
-              out->shape().elem_cnt() * GetSizeOfDataType(out->data_type()));
-#else
-  UNIMPLEMENTED();
-#endif
-  if (this->op_attribute().input_bns().size() == 1){ //start node
-    const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", 0));
-    AutoMemcpy(ctx->stream(), out, in_i);
-  } else {
-    FOR_RANGE(int64_t, i, 0, this->op_attribute().input_bns().size()) {
-      const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", i));
-      primitive->Launch(ctx->stream(), out->dptr(), in_i->dptr(), out->mut_dptr(),
-                          out->shape().elem_cnt());
-    }
+
+  std::vector<const void*> srcs(this->op_attribute().input_bns().size());
+  FOR_RANGE(size_t, i, 0, this->op_attribute().input_bns().size()) {
+    const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", i));
+    srcs[i] = in_i->dptr();
   }
+  primitive->Launch(ctx->stream(), srcs.data(), srcs.size(), out->mut_dptr(),
+                    out->shape().elem_cnt());
+
+// #if defined(WITH_CUDA)
+//   cudaMemset(out->mut_dptr(), 0,
+//               out->shape().elem_cnt() * GetSizeOfDataType(out->data_type()));
+// #else
+//   UNIMPLEMENTED();
+// #endif
+//   if (this->op_attribute().input_bns().size() == 1){ //start node
+//     const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", 0));
+//     AutoMemcpy(ctx->stream(), out, in_i);
+//   } else {
+//     FOR_RANGE(int64_t, i, 0, this->op_attribute().input_bns().size()) {
+//       const Blob* in_i = ctx->BnInOp2Blob(GenRepeatedBn("in", i));
+//       primitive->Launch(ctx->stream(), out->dptr(), in_i->dptr(), out->mut_dptr(),
+//                           out->shape().elem_cnt());
+//     }
+//   }
 }
 
 REGISTER_KERNEL(OperatorConf::kOfCollectiveBoxingReduceConf, OfCollectiveBoxingReduceKernel);
