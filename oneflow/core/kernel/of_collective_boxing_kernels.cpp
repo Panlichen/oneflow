@@ -63,12 +63,12 @@ class OfCollectiveBoxingGenericKernel final : public Kernel {
 // }
 
 void OfCollectiveBoxingGenericKernel::ForwardDataContent(KernelContext* ctx) const {
-  VLOG(1) << "Enter OfCollectiveBoxingGenericKernel::ForwardDataContent";
+  VLOG(2) << "Enter OfCollectiveBoxingGenericKernel::ForwardDataContent";
   Blob* in = ctx->BnInOp2Blob("in");
   Blob* out = ctx->BnInOp2Blob("out");
   AutoMemcpy(ctx->stream(), out, in);
   
-  VLOG(1) << "OfCollectiveBoxingGenericKernel::ForwardDataContent Done";
+  VLOG(2) << "OfCollectiveBoxingGenericKernel::ForwardDataContent Done";
 }
 
 REGISTER_KERNEL(OperatorConf::kOfCollectiveBoxingGenericConf, OfCollectiveBoxingGenericKernel);

@@ -417,6 +417,9 @@ int OfCollectiveActor::HandlerNormal(const ActorMsg& msg) {
     if (ParseBooleanFromEnv("ONEFLOW_OFCCL_SKIP_NEGO", false)) {
       collective_status_ = CollectiveStatus::kCanAct;
       VLOG(2) << "Actor " << actor_id_ << " UpdateCollectiveStatus to " << print_status_[collective_status_];
+      if (IsReadReady() && IsWriteReady()) {
+        Act();
+      }
     } else {
       if (IsReadReady() && IsWriteReady()) {
         if (is_nego_root_) {
@@ -561,7 +564,7 @@ void OfCollectiveActor::ReactToNegoCmd(const ActorMsg& msg) {
     case CollectiveNegoCmd::kCollectiveDone:
       CHECK(collective_status_ == CollectiveStatus::kCanAct) << "Actor " << actor_id_ << " In status " << print_status_[collective_status_] << " should not get " << "kCollectiveStart";
 
-      VLOG(1) << "Actor " << actor_id_ << " receive kCollectiveDone and will return regsts and ResetCollectiveStatus";
+      VLOG(2) << "Actor " << actor_id_ << " receive kCollectiveDone and will return regsts and ResetCollectiveStatus";
       
       AsyncSendNaiveProducedRegstMsgToConsumer();
       // no inplace ctrl regst
@@ -653,7 +656,7 @@ void OfCollectiveActor::Act() {
     );
   });
 
-  VLOG(1) << "Actor " << actor_id_ << " will send itself kCollectiveDone after kernel finish";
+  VLOG(2) << "Actor " << actor_id_ << " will send itself kCollectiveDone after kernel finish";
 
   VLOG(2) << "Actor " << actor_id_ << " OfCollectiveActor::Act() Done";
   return;
