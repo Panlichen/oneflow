@@ -143,6 +143,8 @@ void OfCollectiveBoxingGenericKernel::ForwardDataContent(KernelContext* ctx) con
 
     int coll_id = dynamic_cast<OfCollectiveBoxingKernelState *>(ctx->state().get())->coll_id();
 
+    std::shared_ptr<OfRequestStore> of_request_store = Singleton<CollectiveMgr>::Get()->GetMutOfRequestStore();
+
     issueOfcclAllReduce(actor_id, coll_id, send_buff, recv_buff, ctx, rank_desc);
   }
 }

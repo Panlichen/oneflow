@@ -16,6 +16,8 @@ limitations under the License.
 #ifndef ONEFLOW_CORE_JOB_OF_COLLECTIVE_BOXING_OF_REQUEST_STORE_H_
 #define ONEFLOW_CORE_JOB_OF_COLLECTIVE_BOXING_OF_REQUEST_STORE_H_
 
+#include <queue>
+
 #include "oneflow/core/common/util.h"
 #include "oneflow/core/job/plan.pb.h"
 #include "oneflow/core/common/symbol.h"
@@ -26,6 +28,9 @@ namespace oneflow {
 namespace boxing {
 
 namespace of_collective {
+
+template<class T, class Container = std::vector<T>,  class Compare = std::greater<typename Container::value_type> > // 默认小顶堆
+using Heap = std::priority_queue<T, Container, Compare>;
 
 struct RuntimeNegoTreeInfo {
   int64_t upstream_id;
@@ -88,7 +93,7 @@ struct OfRequestId {
 class OfRequestStore {
  public:
   OF_DISALLOW_COPY_AND_MOVE(OfRequestStore);
-  OfRequestStore() = default;
+  OfRequestStore() : coll_id_counter_(0) {}
   ~OfRequestStore() = default;
 
   void InitJob(int64_t job_id, const RequestSet& request_set);
@@ -140,11 +145,18 @@ class OfRequestStore {
 
   OfRequestEntry* GetOfRequestEntry(void* token);
 
+  // TODO(Panlichen): 考虑支持多个job时的相应调整。
+  HashMap<int64_t, std::vector<int>> job_id2ordered_local_coll_ids;
+  HashMap<int64_t, int> job_id2max_local_coll_id;
+  HashMap<int64_t, Heap<int>> job_id2coll_id_heap_in_one_iter;
+  HashMap<int64_t, int> job_id2last_issued_index;
+
  private:
   HashMap<int64_t, std::vector<std::unique_ptr<OfRequestEntry>>> job_id2request_entry_vec_;
   HashMap<std::string, OfRequestId> name2request_id_;
 
   // 在RequestStore里维护跨越job边界的coll_id
+  // TODO(Panlichen): 支持多job的话，也考虑使用request_desc->order()作为job内部的coll_id。
   int coll_id_counter_;
 };
 

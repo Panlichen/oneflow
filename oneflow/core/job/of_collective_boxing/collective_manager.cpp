@@ -95,6 +95,10 @@ CollectiveMgr::Impl::Impl() {
   collective_builder->Init(request_store);
 }
 
+std::shared_ptr<OfRequestStore> CollectiveMgr::GetMutOfRequestStore() {
+  return impl_->request_store;
+}
+
 OfRequestId CollectiveMgr::GetOfRequestIdByName(const std::string& name) const {
   return impl_->request_store->GetOfRequestIdByName(name);
 }

@@ -49,6 +49,8 @@ class CollectiveMgr final {
 
   ofcclRankCtx_t KernelGetOfcclRankCtx(int rank);
 
+  std::shared_ptr<OfRequestStore> GetMutOfRequestStore();
+
  private:
   friend class Singleton<CollectiveMgr>;
   CollectiveMgr();

@@ -25,7 +25,6 @@ limitations under the License.
 #include "oneflow/core/device/cuda_util.h"
 #include "oneflow/core/common/shape.h"
 
-
 #include <memory>
 #include <utility>
 
@@ -163,6 +162,7 @@ struct CollectiveBackendOfccl::Impl {
   }
 
   void InitCommGroup(int64_t job_id) {
+    // TODO(Panlichen): 在这里实现对多个job的支持，或许libai有需要。
     request_store->ForEachMutOfRequestEntryInJob(
       job_id, [&](OfRequestEntry* request_entry, int32_t i, const OfRequestId& request_id) {
         const auto& request = request_entry->desc();
@@ -211,7 +211,7 @@ struct CollectiveBackendOfccl::Impl {
           ncclRedOp_t nccl_reduce_op = OfcclGetReduceOp(request.op_desc().reduce_method());
           ncclComm_t comm = coll_id2device_set7CommGroup[coll_id].comm_group.GetCommRank(j).nccl_comm();
           
-          // TODO: 目前只实现了AllReduce
+          // TODO(Panlichen): 目前只实现了AllReduce
           if (request.op_desc().op_type() == kOpTypeAllReduce) {
             VLOG(2) << "Prepare coll_id = " << coll_id << " count = " << count << " nccl_data_type = " << nccl_data_type;
             OF_NCCL_CHECK(ofcclPrepareAllReduce(count, nccl_data_type, nccl_reduce_op, comm, coll_id, device_id2ofccl_rank_ctx[curr_device_id]));

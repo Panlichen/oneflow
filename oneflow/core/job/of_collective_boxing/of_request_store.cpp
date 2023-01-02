@@ -57,10 +57,25 @@ void OfRequestStore::InitJob(int64_t job_id, const RequestSet& request_set) {
   for (const RequestDesc& desc : request_set.request()) {
     request_entry_vec.emplace_back(std::make_unique<OfRequestEntry>(desc, coll_id_counter_++));
   }
+  
+  job_id2max_local_coll_id[job_id] = -1;
+  job_id2last_issued_index[job_id] = -1;
+  std::vector<int> &ordered_local_coll_ids = job_id2ordered_local_coll_ids[job_id];
   for (int32_t i = 0; i < request_entry_vec.size(); ++i) {
     const std::unique_ptr<OfRequestEntry>& entry = request_entry_vec.at(i);
+    if (entry->HasRankOnThisNode()) {
+      int entry_coll_id = entry->coll_id();
+      ordered_local_coll_ids.emplace_back(entry_coll_id);
+      job_id2max_local_coll_id[job_id] = entry_coll_id > job_id2max_local_coll_id[job_id] ? entry_coll_id : job_id2max_local_coll_id[job_id];
+    }
+
+    // TODO(Panlichen): OfRequestId大概可以删了。
     CHECK(name2request_id_.emplace(entry->desc().op_desc().name(), OfRequestId(job_id, i)).second);
   }
+  // VLOG(1) << "job_id = " << job_id << " job_id2max_local_coll_id[job_id] = " << job_id2max_local_coll_id[job_id];
+  // for (int32_t i = 0; i < ordered_local_coll_ids.size(); ++i) {
+  //   VLOG(1) << "job_id = " << job_id << " job_id2ordered_local_coll_ids[job_id][" << i << "] = " << job_id2ordered_local_coll_ids[job_id][i];
+  // }
 }
 
 void OfRequestStore::DeinitJob(int64_t job_id) {
