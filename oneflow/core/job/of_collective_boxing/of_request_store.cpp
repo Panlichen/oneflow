@@ -59,11 +59,13 @@ void OfRequestStore::InitJob(int64_t job_id, const RequestSet& request_set) {
   }
   
   job_id2index_to_issue[job_id] = 0;
-  std::vector<int> &ordered_local_coll_ids = job_id2ordered_local_coll_ids[job_id];
+  std::vector<int>& ordered_local_coll_ids = job_id2ordered_local_coll_ids[job_id];
+  HashMap<int, int>& local_coll_id2index = job_id2local_coll_id2index[job_id];
   for (int32_t i = 0; i < request_entry_vec.size(); ++i) {
     const std::unique_ptr<OfRequestEntry>& entry = request_entry_vec.at(i);
     if (entry->HasRankOnThisNode()) {
       int entry_coll_id = entry->coll_id();
+      local_coll_id2index.emplace(entry_coll_id, ordered_local_coll_ids.size());
       ordered_local_coll_ids.emplace_back(entry_coll_id);
     }
 
@@ -71,7 +73,8 @@ void OfRequestStore::InitJob(int64_t job_id, const RequestSet& request_set) {
     CHECK(name2request_id_.emplace(entry->desc().op_desc().name(), OfRequestId(job_id, i)).second);
   }
   // for (int32_t i = 0; i < ordered_local_coll_ids.size(); ++i) {
-  //   VLOG(1) << "job_id = " << job_id << " job_id2ordered_local_coll_ids[job_id][" << i << "] = " << job_id2ordered_local_coll_ids[job_id][i];
+  //   VLOG(1) << "job_id2ordered_local_coll_ids[" << job_id << "][" << i << "] = " << job_id2ordered_local_coll_ids[job_id][i];
+  //   VLOG(1) << "job_id2local_coll_id2index[" << job_id << "][" << job_id2ordered_local_coll_ids[job_id][i] << "] = " << job_id2local_coll_id2index[job_id][job_id2ordered_local_coll_ids[job_id][i]];
   // }
 }
 
