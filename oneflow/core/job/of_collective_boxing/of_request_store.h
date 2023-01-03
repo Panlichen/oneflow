@@ -16,7 +16,10 @@ limitations under the License.
 #ifndef ONEFLOW_CORE_JOB_OF_COLLECTIVE_BOXING_OF_REQUEST_STORE_H_
 #define ONEFLOW_CORE_JOB_OF_COLLECTIVE_BOXING_OF_REQUEST_STORE_H_
 
+#include <memory>
 #include <queue>
+#include <mutex>
+#include <nccl.h>
 
 #include "oneflow/core/common/util.h"
 #include "oneflow/core/job/plan.pb.h"
@@ -29,7 +32,7 @@ namespace boxing {
 
 namespace of_collective {
 
-template<class T, class Container = std::vector<T>,  class Compare = std::greater<typename Container::value_type> > // 默认小顶堆
+template<class T, class Compare = std::greater<T>, class Container = std::vector<T> > // 默认小顶堆
 using Heap = std::priority_queue<T, Container, Compare>;
 
 struct RuntimeNegoTreeInfo {
@@ -90,6 +93,31 @@ struct OfRequestId {
   int32_t request_index;
 };
 
+struct OfIssueParams {
+  int coll_id;
+  const void* send_buff;
+  void* recv_buff;
+  const RankDesc& rank_desc;
+  void *cb_args;
+  CallbackFunc cb_func;
+  ofcclRankCtx_t ofccl_rank_ctx;
+
+  OfIssueParams(int coll_id, const void* send_buff, void* recv_buff, const RankDesc& rank_desc, void *cb_args, CallbackFunc cb_func, ofcclRankCtx_t ofccl_rank_ctx) : coll_id(coll_id), send_buff(send_buff), recv_buff(recv_buff), rank_desc(rank_desc), cb_args(cb_args), cb_func(cb_func), ofccl_rank_ctx(ofccl_rank_ctx) {}
+};
+
+class GreaterOfIssueParams {
+ public:
+  bool operator() (const std::shared_ptr<OfIssueParams>& p1, const std::shared_ptr<OfIssueParams>& p2) {
+    return p1->coll_id > p2->coll_id;
+  }
+};
+class LessOfIssueParams {
+ public:
+  bool operator() (const std::shared_ptr<OfIssueParams>& p1, const std::shared_ptr<OfIssueParams>& p2) {
+    return p1->coll_id < p2->coll_id;
+  }
+};
+
 class OfRequestStore {
  public:
   OF_DISALLOW_COPY_AND_MOVE(OfRequestStore);
@@ -147,9 +175,10 @@ class OfRequestStore {
 
   // TODO(Panlichen): 考虑支持多个job时的相应调整。
   HashMap<int64_t, std::vector<int>> job_id2ordered_local_coll_ids;
-  HashMap<int64_t, int> job_id2max_local_coll_id;
-  HashMap<int64_t, Heap<int>> job_id2coll_id_heap_in_one_iter;
-  HashMap<int64_t, int> job_id2last_issued_index;
+  HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, GreaterOfIssueParams>> job_id2params_heap_in_one_iter; // 小顶堆
+  // HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, LessOfIssueParams>> job_id2params_heap_in_one_iter; // 大顶堆
+  HashMap<int64_t, int> job_id2index_to_issue;
+  HashMap<int64_t, std::mutex> job_id2heap_mutex;
 
  private:
   HashMap<int64_t, std::vector<std::unique_ptr<OfRequestEntry>>> job_id2request_entry_vec_;

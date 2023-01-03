@@ -83,9 +83,9 @@ ActorMsg ActorMsg::BuildCommandMsg(int64_t dst_actor_id, ActorCmd cmd) {
   return msg;
 }
 
-ActorMsg ActorMsg::BuildCollectiveMsg(int64_t srd_actor_id, int64_t dst_actor_id, CollectiveNegoCmd collective_nego_cmd) {
+ActorMsg ActorMsg::BuildCollectiveMsg(int64_t src_actor_id, int64_t dst_actor_id, CollectiveNegoCmd collective_nego_cmd) {
   ActorMsg msg{};
-  msg.src_actor_id_ = srd_actor_id;
+  msg.src_actor_id_ = src_actor_id;
   msg.dst_actor_id_ = dst_actor_id;
   msg.msg_type_ = ActorMsgType::kCollectiveMsg;
   msg.collective_nego_cmd_ = collective_nego_cmd;

@@ -64,7 +64,8 @@ class OfCollectiveBoxingGenericKernel final : public Kernel {
  private:
   struct CallBackArgs {
     int coll_id;
-    int64_t actor_id;
+    int64_t src_actor_id;
+    int64_t dst_actor_id;
     OfCollectiveBoxingActorContext *ctx;
     int64_t rank;
   };
@@ -85,32 +86,68 @@ void OfCollectiveBoxingGenericKernel::issueOfcclAllReduce(int64_t actor_id, int 
 
   CallBackArgs *args = new CallBackArgs();
   // static成员可以在const函数中修改。
-  args->actor_id = actor_id;
+  args->dst_actor_id = actor_id; // 压进堆里的时候只能确定dst是给自己，只有真的执行的时候才知道是谁发送。
   args->coll_id = coll_id;
   args->ctx = GetOfCollectiveBoxingActorContext(ctx);
   args->rank = rank_desc.rank();
 
   // TODO(Panlichen): debug目的捕获this
   auto cb_lambda = [](int collIdFromCqe, void *args) {
-    int64_t actor_id = (static_cast<CallBackArgs *>(args))->actor_id; // void不是类名，不能用dynamic
-    Singleton<ActorMsgBus>::Get()->SendMsg(ActorMsg::BuildCollectiveMsg(actor_id, actor_id, CollectiveNegoCmd::kCollectiveDone));
-    VLOG(2) << "actor " << actor_id << " Rank<" << (static_cast<CallBackArgs *>(args))->rank << "> callback get cqe for coll_id = " << collIdFromCqe << " actor_ctx->coll_done_cnt_ = " << (static_cast<CallBackArgs *>(args))->ctx->coll_done_cnt_++;
+    int64_t dst_actor_id = (static_cast<CallBackArgs *>(args))->dst_actor_id; // void不是类名，不能用dynamic
+    Singleton<ActorMsgBus>::Get()->SendMsg(ActorMsg::BuildCollectiveMsg(dst_actor_id, dst_actor_id, CollectiveNegoCmd::kCollectiveDone));
+    // VLOG(2) << "actor " << actor_id << " Rank<" << (static_cast<CallBackArgs *>(args))->rank << "> callback get cqe for coll_id = " << collIdFromCqe << " actor_ctx->coll_done_cnt_ = " << (static_cast<CallBackArgs *>(args))->ctx->coll_done_cnt_++;
     delete static_cast<CallBackArgs *>(args);
     return 0;
   };
 
   CallbackFunc cb_func = cb_lambda;
-  
-  VLOG(2) << "actor " << actor_id << " Rank<" << rank_desc.rank() << "> before ForwardDataContent coll_id = " << coll_id;
 
-  OF_NCCL_CHECK(ofcclRunAllReduce(send_buff, recv_buff, coll_id, cb_func, args, ofccl_rank_ctx));
+  // 目前的排序方法对于一个coll在一个iter里跑多次的情况不适用。但是有了计算图的话，应该不会一个coll在一个iter里跑多次。
+  auto of_issue_params = std::make_shared<OfIssueParams>(
+    coll_id, send_buff, recv_buff, rank_desc, args, cb_func, ofccl_rank_ctx
+  );
+
+  std::shared_ptr<OfRequestStore> of_request_store = Singleton<CollectiveMgr>::Get()->GetMutOfRequestStore();
+  int64_t job_id = GetOfCollectiveBoxingActorContext(ctx)->task_proto().job_id();
+
+  // of_request_store->job_id2heap_mutex[job_id].lock();
+
+  of_request_store->job_id2params_heap_in_one_iter[job_id].push(of_issue_params);
+
+  VLOG(1) << "actor " << coll_id << " Rank<" << rank_desc.rank() << "> push coll into heap";
+
+  // TODO(Panlichen): 会不会有多线程访问的问题？
+  while (!of_request_store->job_id2params_heap_in_one_iter[job_id].empty()) {
+    auto top_coll_params = of_request_store->job_id2params_heap_in_one_iter[job_id].top();
+    int top_coll_id = top_coll_params->coll_id;
+
+    // 这样的排序方法对于一个coll在一个iter里跑多次的情况不适用。但是有了计算图的话，应该不会一个coll在一个iter里跑多次。
+    // 目前在resnet的场景下不会有问题。
+    if (top_coll_id == of_request_store->job_id2ordered_local_coll_ids[job_id][of_request_store->job_id2index_to_issue[job_id]]) {
+
+      // 我来发送这个coll，也由我之后执行callback、发送msg
+      ((CallBackArgs *)top_coll_params->cb_args)->src_actor_id = GetOfCollectiveBoxingActorContext(ctx)->actor_id();
+
+      OF_NCCL_CHECK(ofcclRunAllReduce(top_coll_params->send_buff, top_coll_params->recv_buff, top_coll_params->coll_id, top_coll_params->cb_func, top_coll_params->cb_args, top_coll_params->ofccl_rank_ctx));
+      of_request_store->job_id2params_heap_in_one_iter[job_id].pop();
+
+      VLOG(1) << "actor " << coll_id << " Rank<" << rank_desc.rank() << "> issue coll_id = " << top_coll_id;
+
+      of_request_store->job_id2index_to_issue[job_id] = (of_request_store->job_id2index_to_issue[job_id] + 1) % of_request_store->job_id2ordered_local_coll_ids[job_id].size();
+    } else {
+      // 当前堆顶的coll不能发射。
+      break;
+    }
+  }
+
+  // of_request_store->job_id2heap_mutex[job_id].unlock();
   
   // ！！！！！！！！！！为了记log加的逻辑！！！！！！！！
   // size_t count = 1;
   // const Shape shape = Shape(rank_desc.op_desc().shape());
   // FOR_RANGE(int, shape_ax, 0, shape.NumAxes()) { count *= shape.At(shape_ax); }
   // CHECK_GT(count, 0);
-  VLOG(2) << "actor " << actor_id << " Rank<" << rank_desc.rank() << "> ForwardDataContent invoke ofcclRunAllReduce with coll_id = " << coll_id  << " actor_ctx->coll_req_cnt_ = " << GetOfCollectiveBoxingActorContext(ctx)->coll_req_cnt_++; // << " send_buff = " << send_buff << " recv_buff = " << recv_buff;
+  // VLOG(2) << "actor " << actor_id << " Rank<" << rank_desc.rank() << "> ForwardDataContent invoke ofcclRunAllReduce with coll_id = " << coll_id  << " actor_ctx->coll_req_cnt_ = " << GetOfCollectiveBoxingActorContext(ctx)->coll_req_cnt_++; // << " send_buff = " << send_buff << " recv_buff = " << recv_buff;
 }
 
 void OfCollectiveBoxingGenericKernel::ForwardDataContent(KernelContext* ctx) const {
@@ -140,11 +177,7 @@ void OfCollectiveBoxingGenericKernel::ForwardDataContent(KernelContext* ctx) con
       CHECK(out->shape() == ShapeView(GenericOpGetOutputShape(rank_desc)));
       recv_buff = out->mut_dptr();
     }
-
-    int coll_id = dynamic_cast<OfCollectiveBoxingKernelState *>(ctx->state().get())->coll_id();
-
-    std::shared_ptr<OfRequestStore> of_request_store = Singleton<CollectiveMgr>::Get()->GetMutOfRequestStore();
-
+    int coll_id = dynamic_cast<OfCollectiveBoxingKernelState *>(ctx->state().get())->coll_id();    
     issueOfcclAllReduce(actor_id, coll_id, send_buff, recv_buff, ctx, rank_desc);
   }
 }
