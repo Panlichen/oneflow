@@ -16,6 +16,7 @@ limitations under the License.
 #ifndef ONEFLOW_CORE_JOB_OF_COLLECTIVE_BOXING_OF_REQUEST_STORE_H_
 #define ONEFLOW_CORE_JOB_OF_COLLECTIVE_BOXING_OF_REQUEST_STORE_H_
 
+#include <functional>
 #include <memory>
 #include <queue>
 #include <mutex>
@@ -93,6 +94,8 @@ struct OfRequestId {
   int32_t request_index;
 };
 
+class OfRequestStore;
+
 struct OfIssueParams {
   int coll_id;
   const void* send_buff;
@@ -101,8 +104,11 @@ struct OfIssueParams {
   void *cb_args;
   CallbackFunc cb_func;
   ofcclRankCtx_t ofccl_rank_ctx;
+  int64_t job_id;
+  std::shared_ptr<HashMap<int64_t, int>> job_id2curr_coll_id_vec;
+  std::shared_ptr<HashMap<int64_t, std::vector<HashMap<int, int>>>> job_id2local_coll_id2index;
 
-  OfIssueParams(int coll_id, const void* send_buff, void* recv_buff, const RankDesc& rank_desc, void *cb_args, CallbackFunc cb_func, ofcclRankCtx_t ofccl_rank_ctx) : coll_id(coll_id), send_buff(send_buff), recv_buff(recv_buff), rank_desc(rank_desc), cb_args(cb_args), cb_func(cb_func), ofccl_rank_ctx(ofccl_rank_ctx) {}
+  OfIssueParams(int coll_id, const void* send_buff, void* recv_buff, const RankDesc& rank_desc, void *cb_args, CallbackFunc cb_func, ofcclRankCtx_t ofccl_rank_ctx, int64_t job_id, std::shared_ptr<HashMap<int64_t, int>>&& job_id2curr_coll_id_vec, std::shared_ptr<HashMap<int64_t, std::vector<HashMap<int, int>>>>&& job_id2local_coll_id2index) : coll_id(coll_id), send_buff(send_buff), recv_buff(recv_buff), rank_desc(rank_desc), cb_args(cb_args), cb_func(cb_func), ofccl_rank_ctx(ofccl_rank_ctx), job_id(job_id), job_id2curr_coll_id_vec(job_id2curr_coll_id_vec), job_id2local_coll_id2index(job_id2local_coll_id2index) {}
 };
 
 class GreaterOfIssueParams {
@@ -115,6 +121,14 @@ class LessOfIssueParams {
  public:
   bool operator() (const std::shared_ptr<OfIssueParams>& p1, const std::shared_ptr<OfIssueParams>& p2) {
     return p1->coll_id < p2->coll_id;
+  }
+};
+class DynamicGreaterOfIssueParams {
+ public:
+  bool operator() (const std::shared_ptr<OfIssueParams>& p1, const std::shared_ptr<OfIssueParams>& p2) {
+    int curr_coll_id_vec = p1->job_id2curr_coll_id_vec->at(p1->job_id);
+    auto curr_local_coll_id2index = p1->job_id2local_coll_id2index->at(p1->job_id)[curr_coll_id_vec];
+    return curr_local_coll_id2index[p1->coll_id] > curr_local_coll_id2index[p2->coll_id];
   }
 };
 
@@ -174,10 +188,12 @@ class OfRequestStore {
   OfRequestEntry* GetOfRequestEntry(void* token);
 
   // TODO(Panlichen): 考虑支持多个job时的相应调整。
-  HashMap<int64_t, std::vector<int>> job_id2ordered_local_coll_ids;
-  HashMap<int64_t, HashMap<int, int>> job_id2local_coll_id2index;
-  HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, GreaterOfIssueParams>> job_id2params_heap_in_one_iter; // 小顶堆
-  // HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, LessOfIssueParams>> job_id2params_heap_in_one_iter; // 大顶堆
+  const static int NUM_COLL_ID_VEC=2;
+  HashMap<int64_t, std::vector<std::vector<int>>> job_id2ordered_local_coll_ids;
+  HashMap<int64_t, std::vector<HashMap<int, int>>> job_id2local_coll_id2index;
+  HashMap<int64_t, int> job_id2curr_coll_id_vec;
+  // HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, GreaterOfIssueParams>> job_id2params_heap_in_one_iter; // 朴素的小顶堆
+  HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, DynamicGreaterOfIssueParams>> job_id2params_heap_in_one_iter; // 动态调整顺序的小顶堆
   HashMap<int64_t, int> job_id2index_to_issue;
   HashMap<int64_t, std::mutex> job_id2heap_mutex;
 

@@ -59,14 +59,24 @@ void OfRequestStore::InitJob(int64_t job_id, const RequestSet& request_set) {
   }
   
   job_id2index_to_issue[job_id] = 0;
-  std::vector<int>& ordered_local_coll_ids = job_id2ordered_local_coll_ids[job_id];
-  HashMap<int, int>& local_coll_id2index = job_id2local_coll_id2index[job_id];
+  job_id2curr_coll_id_vec[job_id] = 0;
+  for (int vec_num = 0; vec_num < NUM_COLL_ID_VEC; ++vec_num) {
+    job_id2ordered_local_coll_ids[job_id].emplace_back(std::vector<int>());
+    job_id2local_coll_id2index[job_id].emplace_back(HashMap<int, int>());
+  }
+
   for (int32_t i = 0; i < request_entry_vec.size(); ++i) {
     const std::unique_ptr<OfRequestEntry>& entry = request_entry_vec.at(i);
     if (entry->HasRankOnThisNode()) {
       int entry_coll_id = entry->coll_id();
-      local_coll_id2index.emplace(entry_coll_id, ordered_local_coll_ids.size());
-      ordered_local_coll_ids.emplace_back(entry_coll_id);
+
+      for (int vec_num = 0; vec_num < NUM_COLL_ID_VEC; ++vec_num) {
+        std::vector<int>& ordered_local_coll_ids = job_id2ordered_local_coll_ids[job_id][vec_num];
+        HashMap<int, int>& local_coll_id2index = job_id2local_coll_id2index[job_id][vec_num];
+
+        local_coll_id2index.emplace(entry_coll_id, ordered_local_coll_ids.size());
+        ordered_local_coll_ids.emplace_back(entry_coll_id);
+      }
     }
 
     // TODO(Panlichen): OfRequestId大概可以删了。

@@ -103,12 +103,14 @@ void OfCollectiveBoxingGenericKernel::issueOfcclAllReduce(int64_t actor_id, int 
   CallbackFunc cb_func = cb_lambda;
 
   // 目前的排序方法对于一个coll在一个iter里跑多次的情况不适用。但是有了计算图的话，应该不会一个coll在一个iter里跑多次。
-  auto of_issue_params = std::make_shared<OfIssueParams>(
-    coll_id, send_buff, recv_buff, rank_desc, args, cb_func, ofccl_rank_ctx
-  );
 
   std::shared_ptr<OfRequestStore> of_request_store = Singleton<CollectiveMgr>::Get()->GetMutOfRequestStore();
   int64_t job_id = GetOfCollectiveBoxingActorContext(ctx)->task_proto().job_id();
+  auto of_issue_params = std::make_shared<OfIssueParams>(
+    coll_id, send_buff, recv_buff, rank_desc, args, cb_func, ofccl_rank_ctx, job_id,
+    std::make_shared<HashMap<int64_t, int>>(of_request_store->job_id2curr_coll_id_vec),
+    std::make_shared<HashMap<int64_t, std::vector<HashMap<int, int>>>>(of_request_store->job_id2local_coll_id2index)
+  );
 
   // of_request_store->job_id2heap_mutex[job_id].lock();
 
@@ -123,7 +125,25 @@ void OfCollectiveBoxingGenericKernel::issueOfcclAllReduce(int64_t actor_id, int 
 
     // 这样的排序方法对于一个coll在一个iter里跑多次的情况不适用。但是有了计算图的话，应该不会一个coll在一个iter里跑多次。
     // 目前在resnet的场景下不会有问题。
-    if (top_coll_id == of_request_store->job_id2ordered_local_coll_ids[job_id][of_request_store->job_id2index_to_issue[job_id]]) {
+    int curr_coll_id_vec = of_request_store->job_id2curr_coll_id_vec[job_id];
+    auto curr_ordered_local_coll_ids = of_request_store->job_id2ordered_local_coll_ids[job_id][curr_coll_id_vec];
+
+    int index_to_issue = of_request_store->job_id2index_to_issue[job_id];
+
+    int next_coll_id_vec = (curr_coll_id_vec + 1) % of_request_store->NUM_COLL_ID_VEC;
+    std::vector<int>& next_ordered_local_coll_ids = of_request_store->job_id2ordered_local_coll_ids[job_id][next_coll_id_vec];
+    HashMap<int, int>& next_local_coll_id2index = of_request_store->job_id2local_coll_id2index[job_id][next_coll_id_vec];
+
+    if (top_coll_id == curr_ordered_local_coll_ids[index_to_issue]) {
+      // 可以发送的时候，同时更新next队列中的coll_id排列
+      // TODO(Panlichen)
+      // TODO(Panlichen)
+      // TODO(Panlichen)
+      // TODO(Panlichen)
+      // TODO(Panlichen)
+      // TODO(Panlichen): 在这里更新是不对的，应该在push那里更新；但是如果各个rank各自更新，又没意义了，我们最初的目的是希望各个rank顺序一致，要是确定一个打乱的顺序，就需要一个rank间的同步机制。
+      next_ordered_local_coll_ids[index_to_issue] = top_coll_id;
+      next_local_coll_id2index[top_coll_id] = index_to_issue;
 
       // 我来发送这个coll，也由我之后执行callback、发送msg
       ((CallBackArgs *)top_coll_params->cb_args)->src_actor_id = GetOfCollectiveBoxingActorContext(ctx)->actor_id();
@@ -133,7 +153,11 @@ void OfCollectiveBoxingGenericKernel::issueOfcclAllReduce(int64_t actor_id, int 
 
       VLOG(1) << "actor " << coll_id << " Rank<" << rank_desc.rank() << "> issue coll_id = " << top_coll_id;
 
-      of_request_store->job_id2index_to_issue[job_id] = (of_request_store->job_id2index_to_issue[job_id] + 1) % of_request_store->job_id2ordered_local_coll_ids[job_id].size();
+      of_request_store->job_id2index_to_issue[job_id] = (of_request_store->job_id2index_to_issue[job_id] + 1) % curr_ordered_local_coll_ids.size();
+      // 切换到下一个coll_id vec
+      if (of_request_store->job_id2index_to_issue[job_id] == 0) {
+        of_request_store->job_id2curr_coll_id_vec[job_id] = (of_request_store->job_id2curr_coll_id_vec[job_id] + 1) % of_request_store->NUM_COLL_ID_VEC;
+      }
     } else {
       // 当前堆顶的coll不能发射。
       break;
