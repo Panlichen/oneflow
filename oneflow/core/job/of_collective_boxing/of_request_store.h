@@ -175,8 +175,8 @@ class OfRequestStore {
 
   // TODO(Panlichen): 考虑支持多个job时的相应调整。
   HashMap<int64_t, std::vector<int>> job_id2ordered_local_coll_ids;
-  HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, GreaterOfIssueParams>> job_id2params_heap_in_one_iter; // 小顶堆
-  // HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, LessOfIssueParams>> job_id2params_heap_in_one_iter; // 大顶堆
+  // HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, GreaterOfIssueParams>> job_id2params_heap_in_one_iter; // 小顶堆
+  HashMap<int64_t, Heap<std::shared_ptr<OfIssueParams>, LessOfIssueParams>> job_id2params_heap_in_one_iter; // 大顶堆
   HashMap<int64_t, int> job_id2index_to_issue;
   HashMap<int64_t, std::mutex> job_id2heap_mutex;
 

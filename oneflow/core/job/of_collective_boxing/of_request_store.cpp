@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/job/of_collective_boxing/of_request_store.h"
+#include <algorithm>
 #include "oneflow/core/job/plan.pb.h"
 #include "oneflow/core/common/maybe.h"
 #include "oneflow/core/control/global_process_ctx.h"
@@ -59,7 +60,7 @@ void OfRequestStore::InitJob(int64_t job_id, const RequestSet& request_set) {
   }
   
   job_id2index_to_issue[job_id] = 0;
-  std::vector<int> &ordered_local_coll_ids = job_id2ordered_local_coll_ids[job_id];
+  std::vector<int>& ordered_local_coll_ids = job_id2ordered_local_coll_ids[job_id];
   for (int32_t i = 0; i < request_entry_vec.size(); ++i) {
     const std::unique_ptr<OfRequestEntry>& entry = request_entry_vec.at(i);
     if (entry->HasRankOnThisNode()) {
@@ -70,9 +71,13 @@ void OfRequestStore::InitJob(int64_t job_id, const RequestSet& request_set) {
     // TODO(Panlichen): OfRequestId大概可以删了。
     CHECK(name2request_id_.emplace(entry->desc().op_desc().name(), OfRequestId(job_id, i)).second);
   }
-  // for (int32_t i = 0; i < ordered_local_coll_ids.size(); ++i) {
-  //   VLOG(1) << "job_id = " << job_id << " job_id2ordered_local_coll_ids[job_id][" << i << "] = " << job_id2ordered_local_coll_ids[job_id][i];
-  // }
+
+  // 使用大顶堆：
+  std::reverse(ordered_local_coll_ids.begin(), ordered_local_coll_ids.end());
+
+  for (int32_t i = 0; i < ordered_local_coll_ids.size(); ++i) {
+    VLOG(1) << "job_id = " << job_id << " job_id2ordered_local_coll_ids[job_id][" << i << "] = " << job_id2ordered_local_coll_ids[job_id][i];
+  }
 }
 
 void OfRequestStore::DeinitJob(int64_t job_id) {
