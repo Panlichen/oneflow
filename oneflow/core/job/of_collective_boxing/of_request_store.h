@@ -25,7 +25,9 @@ limitations under the License.
 #include "oneflow/core/common/util.h"
 #include "oneflow/core/job/plan.pb.h"
 #include "oneflow/core/common/symbol.h"
+#include "oneflow/core/control/global_process_ctx.h"
 #include "oneflow/core/graph/boxing/of_collective_boxing_util.h"
+#include "oneflow/core/rpc/include/base.h"
 
 namespace oneflow {
 
@@ -186,6 +188,16 @@ class OfRequestStore {
   void DestroyOfRequestEntryToken(void* token);
 
   OfRequestEntry* GetOfRequestEntry(void* token);
+
+  void SyncOrderedLocalCollIds(uint64_t job_id) {
+    if (GlobalProcessCtx::IsThisProcessMaster()) {
+      Singleton<CtrlClient>::Get()->PushKV("rank0_vec", job_id2ordered_local_coll_ids[job_id][1]);
+      Singleton<CtrlClient>::Get()->PushKV("rank0_id_map", job_id2local_coll_id2index[job_id][1]);
+    } else {
+      Singleton<CtrlClient>::Get()->PullKV("rank0_vec", &job_id2ordered_local_coll_ids[job_id][1]);
+      Singleton<CtrlClient>::Get()->PullKV("rank0_id_map", &job_id2local_coll_id2index[job_id][1]);
+    }
+  }
 
   // TODO(Panlichen): 考虑支持多个job时的相应调整。
   const static int NUM_COLL_ID_VEC=2;
