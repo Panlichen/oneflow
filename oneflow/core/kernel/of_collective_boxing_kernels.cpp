@@ -116,7 +116,6 @@ void OfCollectiveBoxingGenericKernel::issueOfcclAllReduce(int64_t actor_id, int 
 
   VLOG(1) << "actor " << coll_id << " Rank<" << rank_desc.rank() << "> push coll into heap";
 
-  // TODO(Panlichen): 会不会有多线程访问的问题？
   while (!of_request_store->job_id2params_heap_in_one_iter[job_id].empty()) {
     auto top_coll_params = of_request_store->job_id2params_heap_in_one_iter[job_id].top();
     int top_coll_id = top_coll_params->coll_id;

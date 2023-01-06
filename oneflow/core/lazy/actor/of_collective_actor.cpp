@@ -663,12 +663,6 @@ void OfCollectiveActor::Act() {
   CHECK(IsReadReady() && IsWriteReady() && CanAct()) << "Actor " << actor_id_;
   
   AsyncLaunchKernel([&](int64_t regst_desc_id) -> Regst* { return nullptr; });
-  int64_t actor_id = actor_id_;
-  AddCallback([actor_id](){
-    Singleton<ActorMsgBus>::Get()->SendMsg(
-      ActorMsg::BuildCollectiveMsg(actor_id, actor_id, CollectiveNegoCmd::kCollectiveDone)
-    );
-  });
   return;
 }
 
