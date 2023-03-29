@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#include <glog/logging.h>
 #include "oneflow/core/graph/boxing/chain_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/of_collective_boxing_sub_task_graph_builder.h"
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
@@ -113,8 +114,10 @@ class OfcclCollectiveBoxingAllReduceSubTskGphBuilder final : public SubTskGphBui
         ctx->task_graph()->ConnectWithLbi(in_node, of_collective_node, lbi);
         sorted_out_tasks->emplace_back(of_collective_node);
       }
+      // VLOG(1) << "OfcclCollectiveBoxingAllReduceSubTskGphBuilder succeed";
       return TRY(BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingAllReduceSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingAllReduceSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -153,6 +156,7 @@ class OfcclCollectiveBoxingReduceScatterSubTskGphBuilder final : public SubTskGp
       return TRY(
           BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingReduceScatterSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingReduceScatterSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -212,6 +216,7 @@ class OfcclCollectiveBoxingP2SNoncontinuousSubTskGphBuilder final : public SubTs
       return TRY(
           BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingP2SNoncontinuousSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingP2SNoncontinuousSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -251,6 +256,7 @@ class OfcclCollectiveBoxingAllGatherSubTskGphBuilder final : public SubTskGphBui
       }
       return TRY(BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingAllGatherSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingAllGatherSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -310,6 +316,7 @@ class OfcclCollectiveBoxingS2BNoncontinuousSubTskGphBuilder final : public SubTs
       return TRY(
           BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingS2BNoncontinuousSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingS2BNoncontinuousSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -353,6 +360,7 @@ class OfcclCollectiveBoxingReduceSubTskGphBuilder final : public SubTskGphBuilde
       }
       return TRY(BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingReduceSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingReduceSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -412,6 +420,7 @@ class OfCollectiveBoxingScatterThenOfcclAllGatherSubTskGphBuilder final : public
       return TRY(BuildSubTskGphBuilderStatus(
           "OfCollectiveBoxingScatterThenOfcclAllGatherSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfCollectiveBoxingScatterThenOfcclAllGatherSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   };
@@ -472,6 +481,7 @@ class OfcclCollectiveBoxingBroadcastSubTskGphBuilder final : public SubTskGphBui
       }
       return TRY(BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingBroadcastSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingBroadcastSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -530,6 +540,7 @@ class OfcclCollectiveBoxingAll2AllSubTskGphBuilder final : public SubTskGphBuild
       }
       return TRY(BuildSubTskGphBuilderStatus("OfcclCollectiveBoxingAll2AllSubTskGphBuilder", ""));
     } else {
+      // VLOG(1) << "OfcclCollectiveBoxingAll2AllSubTskGphBuilder failed";
       return Error::BoxingNotSupportedError();
     }
   }
@@ -569,13 +580,13 @@ Maybe<SubTskGphBuilderStatus> OfCollectiveBoxingSubTskGphBuilder::Build(
     const SbpParallel& out_sbp_parallel, const Shape& time_shape) const {
   if (!GlobalJobDesc().Bool("__is_user_function__")) { return Error::BoxingNotSupportedError(); }
 
-  VLOG(1) << "time_shape.elem_cnt() = " << time_shape.elem_cnt();
+  // VLOG(1) << "time_shape.elem_cnt() = " << time_shape.elem_cnt();
   // 为了让occl能真正接管pp的所有coll，关闭这个环境变量
   if (ParseBooleanFromEnv("ONEFLOW_TIME_SHAPE", false)) {
-    VLOG(1) << "Judge IsSourceTimeShape";
+    // VLOG(1) << "Judge IsSourceTimeShape";
     if (!IsSourceTimeShape(time_shape)) { return Error::BoxingNotSupportedError(); }
   } else {
-    VLOG(1) << "Do not care about timeshape";
+    // VLOG(1) << "Do not care about timeshape, so occl takes care of all colls";
   }
   return chain_builder_->Build(ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
                                in_parallel_desc, out_parallel_desc, lbi, logical_blob_desc,

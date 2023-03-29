@@ -25,6 +25,8 @@ Maybe<SubTskGphBuilderStatus> NaiveB2BSubTskGphBuilder::Build(
     const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
     const BlobDesc& logical_blob_desc, const SbpParallel& in_sbp_parallel,
     const SbpParallel& out_sbp_parallel, const Shape& time_shape) const {
+  
+  // VLOG(1) << "enter NaiveB2BSubTskGphBuilder";
   if ((in_parallel_desc.parallel_num() == 1 || in_sbp_parallel.has_broadcast_parallel())
       && (out_parallel_desc.parallel_num() == 1 || out_sbp_parallel.has_broadcast_parallel())) {
     FOR_RANGE(int64_t, out_id, 0, out_parallel_desc.parallel_num()) {
@@ -35,8 +37,10 @@ Maybe<SubTskGphBuilderStatus> NaiveB2BSubTskGphBuilder::Build(
           ctx->task_graph()->GetProxyNode(nearest_in_node, lbi, out_parallel_desc, out_id);
       sorted_out_tasks->emplace_back(proxy);
     }
+    // VLOG(1) << "NaiveB2BSubTskGphBuilder success";
     return TRY(BuildSubTskGphBuilderStatus("NaiveB2BSubTskGphBuilder", ""));
   } else {
+    // VLOG(1) << "NaiveB2BSubTskGphBuilder fails";
     return Error::BoxingNotSupportedError();
   }
 }

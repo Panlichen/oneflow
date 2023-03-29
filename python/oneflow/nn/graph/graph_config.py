@@ -244,7 +244,9 @@ class GraphConfig(object):
             # NOTE(chengcheng): when use gradient accumulation, optimizer nccl allreduce can NOT
             #  overlap with backward, so nccl use compute stream is optimization without negative
             #  effects.
-            nccl_config.enable_use_compute_stream(True)
+            enable_occl = os.getenv("ONEFLOW_ENABLE_OFCCL")
+            if enable_occl != "1":
+                nccl_config.enable_use_compute_stream(True)
 
             # TODO(chengcheng): hotfix.(just for now), logical chain has some bugs in OneEmmbedding,
             #  just using logical chain in acc on.

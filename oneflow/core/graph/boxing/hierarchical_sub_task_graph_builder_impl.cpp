@@ -43,9 +43,9 @@ std::shared_ptr<ChainSubTskGphBuilder> Make1DSubTskGphBuilder() {
   builders.emplace_back(new OneToOneSubTskGphBuilder());
   builders.emplace_back(new B21SubTskGphBuilder());
   if (ParseBooleanFromEnv("ONEFLOW_ENABLE_OFCCL", false)){
-    VLOG(4) << "before OfCollectiveBoxingSubTskGphBuilder";
     builders.emplace_back(new OfCollectiveBoxingSubTskGphBuilder());
   }
+  // VLOG(1) << "nccl_use_compute_stream: " << Singleton<ResourceDesc, ForSession>::Get()->nccl_use_compute_stream();
   if (!Singleton<ResourceDesc, ForSession>::Get()->nccl_use_compute_stream()) {
     builders.emplace_back(new CollectiveBoxingSubTskGphBuilder());
   }
@@ -106,6 +106,7 @@ class FlatSubTskGphBuilder final : public HierarchicalSubTskGphBuilder {
                                       const Shape& time_shape) const override {
     if (in_parallel_desc.hierarchy()->NumAxes() == 1
         && out_parallel_desc.hierarchy()->NumAxes() == 1) {
+      // VLOG(1) << "Make1DSubTskGphBuilder enter Build";
       return sub_tsk_gph_builder_->Build(ctx, sorted_in_tasks, sorted_out_tasks, sorted_ctrl_tasks,
                                          in_parallel_desc, out_parallel_desc, lbi,
                                          logical_blob_desc, in_nd_sbp.sbp_parallel(0),

@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/graph/boxing/fallback_to_cpu_slice_boxing_sub_task_graph_builder.h"
+#include <glog/logging.h>
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 
 namespace oneflow {
@@ -26,6 +27,8 @@ Maybe<SubTskGphBuilderStatus> FallbackToCpuSliceBoxingSubTskGphBuilder::Build(
     const BlobDesc& logical_blob_desc, const SbpParallel& in_sbp_parallel,
     const SbpParallel& out_sbp_parallel, const Shape& time_shape) const {
   std::vector<SubTskGphBuilderStatus> status;
+
+  // VLOG(1) << "enter FallbackToCpuSliceBoxingSubTskGphBuilder";
 
   std::vector<TaskNode*> cpu_in_tasks;
   std::vector<TaskNode*> cpu_out_tasks;
@@ -50,6 +53,7 @@ Maybe<SubTskGphBuilderStatus> FallbackToCpuSliceBoxingSubTskGphBuilder::Build(
                           lbi, logical_blob_desc, in_sbp_parallel, out_sbp_parallel, time_shape));
   if (!boxing_builder_status.IsOk()
       && SubTskGphBuilderUtil::IsErrorBoxingNotSupported(*boxing_builder_status.error())) {
+    // VLOG(1) << "FallbackToCpuSliceBoxingSubTskGphBuilder fails";
     return Error::BoxingNotSupportedError();
   }
   status.push_back(*JUST(boxing_builder_status));
@@ -73,6 +77,7 @@ Maybe<SubTskGphBuilderStatus> FallbackToCpuSliceBoxingSubTskGphBuilder::Build(
     }
   }
 
+  // VLOG(1) << "FallbackToCpuSliceBoxingSubTskGphBuilder success";
   return TRY(MakeComposedSubTskGphBuilderStatus(status));
 }
 

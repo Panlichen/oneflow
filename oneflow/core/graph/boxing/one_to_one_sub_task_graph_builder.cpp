@@ -33,6 +33,7 @@ Maybe<SubTskGphBuilderStatus> OneToOneSubTskGphBuilder::Build(
       TaskNode* proxy = ctx->task_graph()->GetProxyNode(in_node, lbi, out_parallel_desc, i);
       sorted_out_tasks->emplace_back(proxy);
     }
+    // VLOG(1) << "OneToOneSubTskGphBuilder success";
     return TRY(BuildSubTskGphBuilderStatus("OneToOneSubTskGphBuilder", ""));
   } else {
     return Error::BoxingNotSupportedError();

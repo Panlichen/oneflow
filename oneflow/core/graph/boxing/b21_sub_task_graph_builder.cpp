@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/graph/boxing/b21_sub_task_graph_builder.h"
+#include <glog/logging.h>
 #include "oneflow/core/graph/boxing/sub_task_graph_builder_util.h"
 
 namespace oneflow {
@@ -41,6 +42,7 @@ Maybe<SubTskGphBuilderStatus> B21SubTskGphBuilder::Build(
         sorted_ctrl_tasks->at(0).emplace_back(in_node);
       }
     }
+    // VLOG(1) << "B21SubTskGphBuilder success";
     return TRY(BuildSubTskGphBuilderStatus("B21SubTskGphBuilder", ""));
   } else {
     return Error::BoxingNotSupportedError();

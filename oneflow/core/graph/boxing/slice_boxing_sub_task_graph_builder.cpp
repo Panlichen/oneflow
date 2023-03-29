@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "oneflow/core/graph/boxing/slice_boxing_sub_task_graph_builder.h"
+#include <glog/logging.h>
 #include "oneflow/core/register/tensor_slice_view.h"
 #include "oneflow/core/common/balanced_splitter.h"
 #include "oneflow/core/graph/slice_boxing_task_node.h"
@@ -40,23 +41,30 @@ Maybe<SubTskGphBuilderStatus> SliceBoxingSubTskGphBuilder::Build(
     const ParallelDesc& out_parallel_desc, const LogicalBlobId& lbi,
     const BlobDesc& logical_blob_desc, const SbpParallel& in_sbp_parallel,
     const SbpParallel& out_sbp_parallel, const Shape& time_shape) const {
+      
+  // VLOG(1) << "enter SliceBoxingSubTskGphBuilder";
   if (!IsCopyNdPrimitiveSupported(in_parallel_desc.device_type(),
                                   logical_blob_desc.shape().NumAxes())) {
+    // VLOG(1) << "SliceBoxingSubTskGphBuilder fail 1";
     return Error::BoxingNotSupportedError();
   }
   if (!IsCopyNdPrimitiveSupported(out_parallel_desc.device_type(),
                                   logical_blob_desc.shape().NumAxes())) {
+    // VLOG(1) << "SliceBoxingSubTskGphBuilder fail 2";
     return Error::BoxingNotSupportedError();
   }
   if (SubTskGphBuilderUtil::BlobHasDynamicShape(logical_blob_desc)) {
+    // VLOG(1) << "SliceBoxingSubTskGphBuilder fail 3";
     return Error::BoxingNotSupportedError();
   }
   if (SubTskGphBuilderUtil::HasEmptySliceIfSplit(in_parallel_desc.parallel_num(), in_sbp_parallel,
                                                  logical_blob_desc)) {
+    // VLOG(1) << "SliceBoxingSubTskGphBuilder fail 4";
     return Error::BoxingNotSupportedError();
   }
   if (SubTskGphBuilderUtil::HasEmptySliceIfSplit(out_parallel_desc.parallel_num(), out_sbp_parallel,
                                                  logical_blob_desc)) {
+    // VLOG(1) << "SliceBoxingSubTskGphBuilder fail 5";
     return Error::BoxingNotSupportedError();
   }
   if (!(SubTskGphBuilderUtil::IsBoxingS2B(in_sbp_parallel, out_sbp_parallel)
@@ -64,8 +72,11 @@ Maybe<SubTskGphBuilderStatus> SliceBoxingSubTskGphBuilder::Build(
         || SubTskGphBuilderUtil::IsBoxingP2S(in_sbp_parallel, out_sbp_parallel)
         || SubTskGphBuilderUtil::IsBoxingP2B(in_sbp_parallel, out_sbp_parallel)
         || SubTskGphBuilderUtil::IsBoxingB2S(in_sbp_parallel, out_sbp_parallel))) {
+    // VLOG(1) << "SliceBoxingSubTskGphBuilder fail 6";
     return Error::BoxingNotSupportedError();
   }
+
+  // VLOG(1) << "SliceBoxingSubTskGphBuilder takes over";
 
   const auto NewEdge = [&ctx]() -> TaskEdge* { return ctx->task_graph()->NewEdge(); };
   const auto CreateSliceBoxingNode =
