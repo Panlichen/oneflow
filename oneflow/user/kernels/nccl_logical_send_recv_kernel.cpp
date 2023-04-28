@@ -196,12 +196,12 @@ void NcclLogicalSendRecv::Compute(user_op::KernelComputeContext* ctx, user_op::O
   OF_NCCL_CHECK(ncclGroupStart());
   for (int64_t i = 0; i < parallel_num; ++i) {
     if (send_elem_cnts.at(i) != 0) {
-      LOG(INFO) << parallel_id << " send " << send_elem_cnts.at(i) << " to " << i;
+      // LOG(INFO) << parallel_id << " send " << send_elem_cnts.at(i) << " to " << i;
       OF_NCCL_CHECK(ncclSend(send_in_ptr.at(i), send_elem_cnts.at(i), GetNcclDataType(data_type), i,
                              comm, cuda_stream));
     }
     if (recv_elem_cnts.at(i) != 0) {
-      LOG(INFO) << parallel_id << " recv " << recv_elem_cnts.at(i) << " from " << i;
+      // LOG(INFO) << parallel_id << " recv " << recv_elem_cnts.at(i) << " from " << i;
       OF_NCCL_CHECK(ncclRecv(recv_out_ptr.at(i), recv_elem_cnts.at(i), GetNcclDataType(data_type),
                              i, comm, cuda_stream));
     }
