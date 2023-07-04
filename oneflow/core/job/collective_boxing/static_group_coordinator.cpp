@@ -133,6 +133,7 @@ void StaticGroupCoordinator::InitJob(int64_t job_id) {
   std::vector<GroupToken*>& group_id2group_token = info.group_id2group_token;
   const int32_t request_count = impl_->request_store_->RequestCountForJob(job_id);
   request_index2request_group_index.resize(request_count);
+  // 把排完序的request转化为group
   impl_->executor_->GroupRequests(
       request_ids, [&](std::vector<RequestId>&& group, GroupToken* group_token) {
         const int32_t group_id = group_states.size();
@@ -173,12 +174,16 @@ void StaticGroupCoordinator::AddRequest(void* coordinator_token) {
     CHECK_EQ(current_job_id_, request_id.job_id);
   }
   StaticGroupRequestsInfo* info = token->info;
+
+  // 这里从request_index找到group_id和index_in_group，即RequestGroupIndex的成员变量
   const RequestGroupIndex& request_group_index =
       info->request_index2request_group_index.at(request_id.request_index);
+
   info->group_states.at(request_group_index.group_id)
       .AddReadyRequest(request_group_index.index_in_group);
   int64_t num_launched_groups = 0;
   while (true) {
+    // 这里的执行逻辑就是，不管你现在新增的请求是谁，我按照从头到尾的顺序（current_group_idx_in_job_控制），依次启动所有可以跑的group
     auto& group_state = info->group_states.at(current_group_idx_in_job_);
     if (group_state.IsReady()) {
       impl_->executor_->ExecuteGroup(info->group_id2group_token.at(current_group_idx_in_job_));

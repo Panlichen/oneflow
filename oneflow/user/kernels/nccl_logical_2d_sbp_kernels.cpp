@@ -136,6 +136,9 @@ class NcclLogical2DSameDim0AllReduce final : public user_op::OpKernel {
             << ctx->op_name() << std::endl;
     ncclRedOp_t reduce_type = ncclRedOp_t::ncclSum;
     if (in->data_type() == DataType::kBool) { reduce_type = ncclRedOp_t::ncclMax; }
+    
+    VLOG(1) << "same Dim0 all reduce: in->shape_view().elem_cnt() = " << in->shape_view().elem_cnt();
+    
     OF_NCCL_CHECK(ncclAllReduce(in->dptr(), out->mut_dptr(), in->shape_view().elem_cnt(),
                                 GetNcclDataType(in->data_type()), reduce_type, nccl_comm->comm(),
                                 ctx->stream()->As<ep::CudaStream>()->cuda_stream()));
@@ -470,6 +473,9 @@ class NcclLogical2DSameDim1AllReduce final : public user_op::OpKernel {
             << ctx->op_name() << std::endl;
     ncclRedOp_t reduce_type = ncclRedOp_t::ncclSum;
     if (in->data_type() == DataType::kBool) { reduce_type = ncclRedOp_t::ncclMax; }
+    
+    VLOG(1) << "same Dim1 all reduce: in->shape_view().elem_cnt() = " << in->shape_view().elem_cnt();
+    
     OF_NCCL_CHECK(ncclAllReduce(in->dptr(), out->mut_dptr(), in->shape_view().elem_cnt(),
                                 GetNcclDataType(in->data_type()), reduce_type, nccl_comm->comm(),
                                 ctx->stream()->As<ep::CudaStream>()->cuda_stream()));
